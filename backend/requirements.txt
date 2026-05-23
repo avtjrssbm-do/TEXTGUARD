@@ -5,3 +5,4 @@ requests
 python-docx
 PyPDF2
 scikit-learn
+language-tool-python
