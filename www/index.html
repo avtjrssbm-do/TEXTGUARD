@@ -2,15 +2,12 @@
 <html lang="ru">
 
 <head>
-
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>TextGuard</title>
 
 <link rel="manifest" href="manifest.json">
-
 <meta name="theme-color" content="#0B3D91">
 
 <style>
@@ -107,66 +104,62 @@ async function checkFile(){
 
     formData.append("file", file);
 
-    const response = await fetch(
-        "http://192.168.1.5:8000/check",
-        {
-            method:"POST",
-            body:formData
-        }
-    );
+    try{
 
-    const data = await response.json();
+        const response = await fetch(
+            "https://textguard-ychm.onrender.com/check",
+            {
+                method:"POST",
+                body:formData
+            }
+        );
 
-    if(data.error){
+        const data = await response.json();
 
-        document.getElementById("result").innerHTML = `
+        if(data.error){
+
+            document.getElementById("result").innerHTML = `
             <div class="card">
                 ${data.error}
             </div>
-        `;
+            `;
 
-        return;
-    }
+            return;
+        }
 
-    let html = `
+        let html = `
         <div class="card">
 
-            <h3>${data.filename}</h3>
+        <h3>${data.filename}</h3>
 
-            <p>
-            📊 Плагиат:
-            <b>${data.plagiarism}%</b>
-            </p>
+        <p>
+        📊 Плагиат:
+        <b>${data.plagiarism}%</b>
+        </p>
 
-            <p>
-            ✅ Уникальность:
-            <b>${data.uniqueness}%</b>
-            </p>
+        <p>
+        📚 Источник:
+        ${data.source}
+        </p>
 
-            <p>
-            📚 Источник:
-            ${data.source}
-            </p>
-
-            <p>
-            ❗ Ошибок:
-            ${data.errors_count}
-            </p>
+        <p>
+        ❗ Ошибок:
+        ${data.errors_count}
+        </p>
 
         </div>
-    `;
-
-    if(data.errors.length > 0){
-
-        html += `
-        <div class="card">
-
-        <h3>Ошибки</h3>
         `;
 
-        data.errors.forEach(e => {
+        if(data.errors.length>0){
 
-            html += `
+            html+=`
+            <div class="card">
+            <h3>Ошибки</h3>
+            `;
+
+            data.errors.forEach(e=>{
+
+                html+=`
                 <div class="error">
 
                 <b>${e.word}</b><br>
@@ -176,13 +169,28 @@ async function checkFile(){
                 ${e.replacements.join(", ")}
 
                 </div>
-            `;
-        });
+                `;
+            });
 
-        html += `</div>`;
+            html+=`</div>`;
+        }
+
+        document.getElementById("result").innerHTML=html;
+
     }
 
-    document.getElementById("result").innerHTML = html;
+    catch(error){
+
+        document.getElementById("result").innerHTML=`
+        <div class="card">
+        Ошибка подключения к серверу
+        </div>
+        `;
+
+        console.log(error);
+
+    }
+
 }
 
 </script>
@@ -196,4 +204,5 @@ if('serviceWorker' in navigator){
 </script>
 
 </body>
+
 </html>
