@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>TextGuard</title>
+
+<link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#0B3D91">
+
+<style>
+
+body{
+    margin:0;
+    font-family:Arial;
+    background:linear-gradient(135deg,#0B3D91,#1E90FF);
+    color:white;
+}
+
+.container{
+    max-width:500px;
+    margin:auto;
+    padding:20px;
+}
+
+h1{
+    text-align:center;
+}
+
+.card{
+    background:white;
+    color:black;
+    padding:15px;
+    border-radius:15px;
+    margin-top:15px;
+}
+
+input,button{
+    width:100%;
+    padding:12px;
+    margin-top:10px;
+    border:none;
+    border-radius:10px;
+}
+
+button{
+    background:#00C853;
+    color:white;
+    cursor:pointer;
+    font-size:16px;
+}
+
+button:hover{
+    background:#00A844;
+}
+
+.error{
+    border-left:4px solid red;
+    padding:8px;
+    margin-top:8px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📘 TextGuard</h1>
+
+<div class="card">
+
+<h3>Загрузите файл</h3>
+
+<input type="file" id="file">
+
+<button onclick="checkFile()">
+Проверить
+</button>
+
+</div>
+
+<div id="result"></div>
+
+</div>
+
+<script>
+
+async function checkFile(){
+
+    const file =
+        document.getElementById("file").files[0];
+
+    if(!file){
+        alert("Выберите файл");
+        return;
+    }
+
+    const formData = new FormData();
+
+    formData.append("file", file);
+
+    const response = await fetch(
+        "http://192.168.1.5:8000/check",
+        {
+            method:"POST",
+            body:formData
+        }
+    );
+
+    const data = await response.json();
+
+    if(data.error){
+
+        document.getElementById("result").innerHTML = `
+            <div class="card">
+                ${data.error}
+            </div>
+        `;
+
+        return;
+    }
+
+    let html = `
+        <div class="card">
+
+            <h3>${data.filename}</h3>
+
+            <p>
+            📊 Плагиат:
+            <b>${data.plagiarism}%</b>
+            </p>
+
+            <p>
+            ✅ Уникальность:
+            <b>${data.uniqueness}%</b>
+            </p>
+
+            <p>
+            📚 Источник:
+            ${data.source}
+            </p>
+
+            <p>
+            ❗ Ошибок:
+            ${data.errors_count}
+            </p>
+
+        </div>
+    `;
+
+    if(data.errors.length > 0){
+
+        html += `
+        <div class="card">
+
+        <h3>Ошибки</h3>
+        `;
+
+        data.errors.forEach(e => {
+
+            html += `
+                <div class="error">
+
+                <b>${e.word}</b><br>
+
+                ${e.message}<br>
+
+                ${e.replacements.join(", ")}
+
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+    }
+
+    document.getElementById("result").innerHTML = html;
+}
+
+</script>
+
+<script>
+
+if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js');
+}
+
+</script>
+
+</body>
+</html>

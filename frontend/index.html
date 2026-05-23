@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+content="width=device-width,initial-scale=1">
+
+<title>TextGuard</title>
+
+<link rel="manifest"
+href="manifest.json">
+
+<style>
+
+body{
+
+margin:0;
+padding:0;
+font-family:Arial;
+
+background:linear-gradient(
+135deg,
+#0B3D91,
+#1E90FF
+);
+
+color:white;
+}
+
+.container{
+
+max-width:500px;
+margin:auto;
+padding:20px;
+}
+
+.card{
+
+background:white;
+color:black;
+
+padding:15px;
+
+margin-top:20px;
+
+border-radius:15px;
+}
+
+button,input{
+
+width:100%;
+padding:12px;
+
+margin-top:10px;
+
+border:none;
+
+border-radius:10px;
+}
+
+button{
+
+background:#00C853;
+color:white;
+
+font-size:16px;
+}
+
+.error{
+
+border-left:4px solid red;
+
+padding:10px;
+
+margin-top:10px;
+}
+
+.loader{
+
+display:none;
+text-align:center;
+margin-top:15px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📘 TextGuard</h1>
+
+<div class="card">
+
+<h3>Выберите файл</h3>
+
+<input
+type="file"
+id="file">
+
+<button onclick="checkFile()">
+
+Проверить
+
+</button>
+
+<div
+class="loader"
+id="loader">
+
+Проверка...
+
+</div>
+
+</div>
+
+<div id="result"></div>
+
+</div>
+
+<script>
+
+async function checkFile(){
+
+const file=
+document.getElementById(
+"file"
+).files[0];
+
+if(!file){
+
+alert(
+"Выберите файл"
+);
+
+return;
+}
+
+document.getElementById(
+"loader"
+).style.display=
+"block";
+
+const formData=
+new FormData();
+
+formData.append(
+"file",
+file
+);
+
+try{
+
+const response=
+await fetch(
+"https://textguard.onrender.com/check",
+{
+method:"POST",
+body:formData
+}
+);
+
+const data=
+await response.json();
+
+let html=
+`
+<div class="card">
+
+<h3>${data.filename}</h3>
+
+<p>
+📊 Плагиат:
+<b>${data.plagiarism}%</b>
+</p>
+
+<p>
+📚 Источник:
+${data.source}
+</p>
+
+<p>
+❗ Ошибок:
+${data.errors_count}
+</p>
+
+<p>
+⏱ Время:
+${data.time} сек
+</p>
+
+</div>
+`;
+
+if(
+data.errors.length>0
+){
+
+html+=
+`
+<div class="card">
+
+<h3>
+Ошибки
+</h3>
+`;
+
+data.errors.forEach(
+e=>{
+
+html+=
+`
+<div class="error">
+
+<b>
+
+${e.word}
+
+</b>
+
+<br>
+
+${e.message}
+
+<br>
+
+${e.replacements.join(", ")}
+
+</div>
+`;
+
+});
+
+html+=`</div>`;
+}
+
+document.getElementById(
+"result"
+).innerHTML=
+html;
+
+}
+catch{
+
+alert(
+"Ошибка подключения"
+);
+}
+
+document.getElementById(
+"loader"
+).style.display=
+"none";
+}
+
+</script>
+
+</body>
+</html>
