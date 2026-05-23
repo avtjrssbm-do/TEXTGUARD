@@ -96,20 +96,21 @@ def check_spelling(text):
         response = requests.post(
             API_URL,
             data={
-                "text": text[:5000],
+                "text": text,
                 "language": "ru"
             },
-            timeout=10
+            timeout=15
         )
 
         data = response.json()
 
-    except:
+    except Exception:
+
         return []
 
-    errors=[]
+    errors = []
 
-    seen=set()
+    seen = set()
 
     for m in data.get(
         "matches",
@@ -118,7 +119,8 @@ def check_spelling(text):
 
         word = text[
             m["offset"]:
-            m["offset"]+m["length"]
+            m["offset"] +
+            m["length"]
         ]
 
         if word in seen:
@@ -136,11 +138,15 @@ def check_spelling(text):
 
             "replacements":
             [
+
                 x["value"]
-                for x in m.get(
+
+                for x in
+                m.get(
                     "replacements",
                     []
                 )[:5]
+
             ]
         })
 
@@ -149,15 +155,15 @@ def check_spelling(text):
 
 def clean_text(text):
 
-    text=text.lower()
+    text = text.lower()
 
-    text=re.sub(
+    text = re.sub(
         r"\s+",
         " ",
         text
     )
 
-    text=re.sub(
+    text = re.sub(
         r"[^\w\s]",
         "",
         text
@@ -168,20 +174,20 @@ def clean_text(text):
 
 def check_plagiarism(text):
 
-    docs=[]
+    docs = []
 
     for filename in os.listdir(
         DATABASE_FOLDER
     ):
 
-        path=os.path.join(
+        path = os.path.join(
             DATABASE_FOLDER,
             filename
         )
 
         try:
 
-            content=extract_text(
+            content = extract_text(
                 path
             )
 
@@ -197,9 +203,12 @@ def check_plagiarism(text):
 
     if not docs:
 
-        return 0,"База пуста"
+        return (
+            0,
+            "База пуста"
+        )
 
-    cleaned_docs=[
+    cleaned_docs = [
 
         clean_text(
             d[1]
@@ -208,37 +217,40 @@ def check_plagiarism(text):
         for d in docs
     ]
 
-    input_text=clean_text(
+    input_text = clean_text(
         text
     )
 
-    all_texts=cleaned_docs+[
+    all_texts = cleaned_docs + [
         input_text
     ]
 
-    vectorizer=TfidfVectorizer(
+    vectorizer = TfidfVectorizer(
         ngram_range=(2,3),
         max_features=10000
     )
 
-    tfidf=vectorizer.fit_transform(
+    tfidf = vectorizer.fit_transform(
         all_texts
     )
 
-    similarity=cosine_similarity(
+    similarity = cosine_similarity(
         tfidf[-1],
         tfidf[:-1]
     )
 
-    score=float(
+    score = float(
         similarity.max()
-    )*100
+    ) * 100
 
-    index=similarity.argmax()
+    index = similarity.argmax()
 
-    source=docs[index][0]
+    source = docs[index][0]
 
-    return round(score,2),source
+    return (
+        round(score,2),
+        source
+    )
 
 
 @app.get("/")
@@ -248,17 +260,18 @@ def home():
 
         "status":
         "TextGuard API running"
+
     }
 
 
 @app.post("/check")
 async def check(
-    file: UploadFile = File(...)
+        file: UploadFile = File(...)
 ):
 
-    start=time.time()
+    start = time.time()
 
-    filepath=os.path.join(
+    filepath = os.path.join(
         UPLOAD_FOLDER,
         file.filename
     )
@@ -273,15 +286,15 @@ async def check(
             buffer
         )
 
-    text=extract_text(
+    text = extract_text(
         filepath
     )
 
-    errors=check_spelling(
+    errors = check_spelling(
         text
     )
 
-    plagiarism,source=check_plagiarism(
+    plagiarism, source = check_plagiarism(
         text
     )
 
@@ -291,14 +304,14 @@ async def check(
         file.filename,
 
         "text":
-        text[:3000],
+        text,
 
         "plagiarism":
         plagiarism,
 
         "uniqueness":
         round(
-            100-plagiarism,
+            100 - plagiarism,
             2
         ),
 
@@ -316,4 +329,5 @@ async def check(
             time.time()-start,
             2
         )
+
     }
