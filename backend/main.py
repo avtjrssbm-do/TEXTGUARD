@@ -2,10 +2,10 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from docx import Document
 from PyPDF2 import PdfReader
+import language_tool_python
 
 import os
 import shutil
-import requests
 import re
 import time
 
@@ -25,52 +25,29 @@ app.add_middleware(
 UPLOAD_FOLDER = "uploads"
 DATABASE_FOLDER = "documents_db"
 
-API_URL = "https://api.languagetool.org/v2/check"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(DATABASE_FOLDER, exist_ok=True)
 
-os.makedirs(
-    UPLOAD_FOLDER,
-    exist_ok=True
-)
-
-os.makedirs(
-    DATABASE_FOLDER,
-    exist_ok=True
-)
+tool = language_tool_python.LanguageTool('ru-RU')
 
 
 def load_txt(path):
-
-    with open(
-        path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-
+    with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
 
 def load_docx(path):
-
     doc = Document(path)
-
-    return "\n".join(
-        p.text
-        for p in doc.paragraphs
-    )
+    return "\n".join(p.text for p in doc.paragraphs)
 
 
 def load_pdf(path):
-
     reader = PdfReader(path)
 
     text = ""
 
     for page in reader.pages:
-
-        text += (
-            page.extract_text()
-            or ""
-        )
+        text += page.extract_text() or ""
 
     return text
 
@@ -91,68 +68,35 @@ def extract_text(path):
 
 def check_spelling(text):
 
-    try:
+    text = text[:5000]
 
-        text = text[:5000]
-
-        response = requests.post(
-            API_URL,
-            data={
-                "text": text,
-                "language": "ru-RU"
-            },
-            timeout=10
-        )
-
-        data = response.json()
-
-    except Exception:
-
-        return []
+    matches = tool.check(text)
 
     errors = []
 
     seen = set()
 
-    for m in data.get(
-        "matches",
-        []
-    ):
+    for m in matches:
 
         word = text[
-            m["offset"]:
-            m["offset"] + m["length"]
+            m.offset:
+            m.offset + m.errorLength
         ]
-
-        if len(word.strip()) < 2:
-            continue
 
         if word in seen:
             continue
 
         seen.add(word)
 
-        replacements = []
-
-        for r in m.get(
-            "replacements",
-            []
-        )[:5]:
-
-            replacements.append(
-                r["value"]
-            )
-
         errors.append({
 
-            "word":
-            word,
+            "word": word,
 
             "message":
-            m["message"],
+            m.message,
 
             "replacements":
-            replacements
+            m.replacements[:5]
 
         })
 
@@ -193,9 +137,7 @@ def check_plagiarism(text):
 
         try:
 
-            content = extract_text(
-                path
-            )
+            content = extract_text(path)
 
             docs.append(
                 (
@@ -207,27 +149,19 @@ def check_plagiarism(text):
         except:
             continue
 
-    if len(docs) == 0:
-
+    if not docs:
         return 0, "База пуста"
 
     cleaned_docs = [
-
-        clean_text(
-            d[1]
-        )
-
+        clean_text(d[1])
         for d in docs
     ]
 
-    input_text = clean_text(
-        text
-    )
+    input_text = clean_text(text)
 
-    all_texts = (
-        cleaned_docs +
-        [input_text]
-    )
+    all_texts = cleaned_docs + [
+        input_text
+    ]
 
     vectorizer = TfidfVectorizer(
         ngram_range=(2,3),
@@ -249,24 +183,17 @@ def check_plagiarism(text):
 
     index = similarity.argmax()
 
-    source = docs[
-        index
-    ][0]
+    source = docs[index][0]
 
-    return round(
-        score,
-        2
-    ), source
+    return round(score,2), source
 
 
 @app.get("/")
 def home():
 
     return {
-
         "status":
         "TextGuard API running"
-
     }
 
 
