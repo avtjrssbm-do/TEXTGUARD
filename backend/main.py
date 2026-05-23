@@ -12,6 +12,7 @@ import time
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+
 app = FastAPI()
 
 app.add_middleware(
@@ -25,29 +26,54 @@ app.add_middleware(
 UPLOAD_FOLDER = "uploads"
 DATABASE_FOLDER = "documents_db"
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(DATABASE_FOLDER, exist_ok=True)
+os.makedirs(
+    UPLOAD_FOLDER,
+    exist_ok=True
+)
 
-tool = language_tool_python.LanguageTool('ru-RU')
+os.makedirs(
+    DATABASE_FOLDER,
+    exist_ok=True
+)
+
+tool = language_tool_python.LanguageTool(
+    'ru-RU'
+)
 
 
 def load_txt(path):
-    with open(path, "r", encoding="utf-8") as f:
+
+    with open(
+        path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+
         return f.read()
 
 
 def load_docx(path):
+
     doc = Document(path)
-    return "\n".join(p.text for p in doc.paragraphs)
+
+    return "\n".join(
+        p.text
+        for p in doc.paragraphs
+    )
 
 
 def load_pdf(path):
+
     reader = PdfReader(path)
 
     text = ""
 
     for page in reader.pages:
-        text += page.extract_text() or ""
+
+        text += (
+            page.extract_text()
+            or ""
+        )
 
     return text
 
@@ -68,39 +94,60 @@ def extract_text(path):
 
 def check_spelling(text):
 
-    text = text[:5000]
+    try:
 
-    matches = tool.check(text)
+        text = text[:5000]
 
-    errors = []
+        matches = tool.check(
+            text
+        )
 
-    seen = set()
+        errors = []
 
-    for m in matches:
+        seen = set()
 
-        word = text[
-            m.offset:
-            m.offset + m.errorLength
-        ]
+        for m in matches:
 
-        if word in seen:
-            continue
+            word = text[
+                m.offset:
+                m.offset+m.errorLength
+            ]
 
-        seen.add(word)
+            word = word.strip()
 
-        errors.append({
+            if len(word) < 2:
+                continue
 
-            "word": word,
+            if word in seen:
+                continue
 
-            "message":
-            m.message,
+            seen.add(
+                word
+            )
 
-            "replacements":
-            m.replacements[:5]
+            errors.append({
 
-        })
+                "word":
+                word,
 
-    return errors
+                "message":
+                m.message,
+
+                "replacements":
+                m.replacements[:5]
+
+            })
+
+        return errors
+
+    except Exception as e:
+
+        print(
+            "Spelling error:",
+            e
+        )
+
+        return []
 
 
 def clean_text(text):
@@ -124,7 +171,7 @@ def clean_text(text):
 
 def check_plagiarism(text):
 
-    docs = []
+    docs=[]
 
     for filename in os.listdir(
         DATABASE_FOLDER
@@ -137,7 +184,9 @@ def check_plagiarism(text):
 
         try:
 
-            content = extract_text(path)
+            content = extract_text(
+                path
+            )
 
             docs.append(
                 (
@@ -149,65 +198,102 @@ def check_plagiarism(text):
         except:
             continue
 
-    if not docs:
-        return 0, "База пуста"
 
-    cleaned_docs = [
-        clean_text(d[1])
+    if len(docs)==0:
+
+        return 0,"База пуста"
+
+
+    cleaned_docs=[
+
+        clean_text(
+            d[1]
+        )
+
         for d in docs
     ]
 
-    input_text = clean_text(text)
 
-    all_texts = cleaned_docs + [
+    input_text = clean_text(
+        text
+    )
+
+
+    all_texts=cleaned_docs+[
+
         input_text
+
     ]
 
-    vectorizer = TfidfVectorizer(
+
+    vectorizer=TfidfVectorizer(
+
         ngram_range=(2,3),
         max_features=10000
+
     )
 
-    tfidf = vectorizer.fit_transform(
+
+    tfidf=vectorizer.fit_transform(
+
         all_texts
+
     )
 
-    similarity = cosine_similarity(
+
+    similarity=cosine_similarity(
+
         tfidf[-1],
         tfidf[:-1]
+
     )
 
-    score = float(
+
+    score=float(
+
         similarity.max()
-    ) * 100
 
-    index = similarity.argmax()
+    )*100
 
-    source = docs[index][0]
 
-    return round(score,2), source
+    index=similarity.argmax()
+
+
+    source=docs[index][0]
+
+
+    return round(
+        score,
+        2
+    ),source
 
 
 @app.get("/")
 def home():
 
     return {
+
         "status":
         "TextGuard API running"
+
     }
 
 
 @app.post("/check")
 async def check(
-    file: UploadFile = File(...)
+        file: UploadFile = File(...)
 ):
 
-    start = time.time()
+    start=time.time()
 
-    filepath = os.path.join(
+
+    filepath=os.path.join(
+
         UPLOAD_FOLDER,
         file.filename
+
     )
+
 
     with open(
         filepath,
@@ -215,21 +301,33 @@ async def check(
     ) as buffer:
 
         shutil.copyfileobj(
+
             file.file,
             buffer
+
         )
 
-    text = extract_text(
+
+    text=extract_text(
+
         filepath
+
     )
 
-    errors = check_spelling(
+
+    errors=check_spelling(
+
         text
+
     )
 
-    plagiarism, source = check_plagiarism(
+
+    plagiarism,source=check_plagiarism(
+
         text
+
     )
+
 
     return {
 
@@ -262,4 +360,5 @@ async def check(
             time.time()-start,
             2
         )
+
     }
