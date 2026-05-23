@@ -1,31 +1,18 @@
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
 
 <meta charset="UTF-8">
-
-<meta name="viewport"
-content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
 <title>TextGuard</title>
-
-<link rel="manifest"
-href="manifest.json">
 
 <style>
 
 body{
 margin:0;
-padding:0;
 font-family:Arial;
-
-background:linear-gradient(
-135deg,
-#0B3D91,
-#1E90FF
-);
-
+background:linear-gradient(135deg,#0B3D91,#1E90FF);
 color:white;
 }
 
@@ -33,10 +20,6 @@ color:white;
 max-width:500px;
 margin:auto;
 padding:20px;
-}
-
-h1{
-text-align:center;
 }
 
 .card{
@@ -62,20 +45,16 @@ font-size:16px;
 cursor:pointer;
 }
 
-button:hover{
-background:#00A844;
+.loader{
+display:none;
+margin-top:15px;
+text-align:center;
 }
 
 .error{
 border-left:4px solid red;
 padding:10px;
 margin-top:10px;
-}
-
-.loader{
-display:none;
-text-align:center;
-margin-top:15px;
 }
 
 </style>
@@ -92,20 +71,14 @@ margin-top:15px;
 
 <h3>Выберите файл</h3>
 
-<input
-type="file"
-id="file">
+<input type="file" id="file">
 
 <button onclick="checkFile()">
 Проверить
 </button>
 
-<div
-class="loader"
-id="loader">
-
+<div id="loader" class="loader">
 Проверка...
-
 </div>
 
 </div>
@@ -118,24 +91,21 @@ id="loader">
 
 async function checkFile(){
 
+try{
+
 const file=
-document.getElementById(
-"file"
-).files[0];
+document.getElementById("file").files[0];
 
 if(!file){
 
-alert(
-"Выберите файл"
-);
+alert("Выберите файл");
 
 return;
 }
 
 document.getElementById(
 "loader"
-).style.display=
-"block";
+).style.display="block";
 
 const formData=
 new FormData();
@@ -144,8 +114,6 @@ formData.append(
 "file",
 file
 );
-
-try{
 
 const response=
 await fetch(
@@ -156,57 +124,56 @@ body:formData
 }
 );
 
+if(!response.ok){
+
+throw new Error(
+"Ошибка сервера: "+response.status
+);
+
+}
+
 const data=
 await response.json();
 
-let html=
-`
+let html=`
+
 <div class="card">
 
 <h3>${data.filename}</h3>
 
-<p>
-📊 Плагиат:
-<b>${data.plagiarism}%</b>
-</p>
+<p>📊 Плагиат: <b>${data.plagiarism}%</b></p>
 
-<p>
-📚 Источник:
+<p>📚 Источник:
 ${data.source}
 </p>
 
-<p>
-❗ Ошибок:
+<p>❗ Ошибок:
 ${data.errors_count}
+</p>
+
+<p>⏱ Время:
+${data.time}
+сек
 </p>
 
 </div>
 `;
 
-if(
-data.errors &&
-data.errors.length>0
-){
+if(data.errors){
 
-html+=
-`
+html+=`
 <div class="card">
 
-<h3>
-Ошибки
-</h3>
+<h3>Ошибки</h3>
 `;
 
-data.errors.forEach(
-e=>{
+data.errors.forEach(e=>{
 
-html+=
-`
+html+=`
+
 <div class="error">
 
-<b>
-${e.word}
-</b>
+<b>${e.word}</b>
 
 <br>
 
@@ -226,32 +193,22 @@ html+=`</div>`;
 
 document.getElementById(
 "result"
-).innerHTML=
-html;
+).innerHTML=html;
 
 }
-catch{
+catch(error){
 
 alert(
-"Ошибка подключения к серверу"
+"Ошибка: "+error.message
 );
+
+console.log(error);
+
 }
 
 document.getElementById(
 "loader"
-).style.display=
-"none";
-}
-
-</script>
-
-<script>
-
-if('serviceWorker' in navigator){
-
-navigator.serviceWorker.register(
-'sw.js'
-);
+).style.display="none";
 
 }
 
