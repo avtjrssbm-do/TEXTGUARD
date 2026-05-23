@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
 
 <meta charset="UTF-8">
@@ -7,19 +8,30 @@
 
 <title>TextGuard</title>
 
+<link rel="manifest" href="manifest.json">
+
 <style>
 
 body{
 margin:0;
+padding:0;
 font-family:Arial;
-background:linear-gradient(135deg,#0B3D91,#1E90FF);
+background:linear-gradient(
+135deg,
+#0B3D91,
+#1E90FF
+);
 color:white;
 }
 
 .container{
-max-width:500px;
+max-width:550px;
 margin:auto;
 padding:20px;
+}
+
+h1{
+text-align:center;
 }
 
 .card{
@@ -28,6 +40,7 @@ color:black;
 padding:15px;
 margin-top:20px;
 border-radius:15px;
+box-shadow:0 4px 10px rgba(0,0,0,.2);
 }
 
 button,input{
@@ -45,16 +58,64 @@ font-size:16px;
 cursor:pointer;
 }
 
-.loader{
-display:none;
-margin-top:15px;
-text-align:center;
+button:hover{
+background:#00A844;
 }
 
 .error{
 border-left:4px solid red;
 padding:10px;
 margin-top:10px;
+background:#fff0f0;
+}
+
+.progress-container{
+
+display:none;
+
+width:100%;
+height:20px;
+
+background:#ddd;
+
+border-radius:30px;
+
+margin-top:15px;
+
+overflow:hidden;
+}
+
+.progress-bar{
+
+width:0%;
+
+height:100%;
+
+background:#00C853;
+
+transition:0.4s;
+}
+
+.preview{
+
+background:#f5f5f5;
+
+padding:10px;
+
+margin-top:10px;
+
+border-radius:10px;
+
+max-height:250px;
+
+overflow:auto;
+}
+
+.highlight{
+
+background:#ffb3b3;
+padding:2px;
+border-radius:4px;
 }
 
 </style>
@@ -71,14 +132,35 @@ margin-top:10px;
 
 <h3>Выберите файл</h3>
 
-<input type="file" id="file">
+<input
+type="file"
+id="file"
+onchange="showPreview()">
 
 <button onclick="checkFile()">
+
 Проверить
+
 </button>
 
-<div id="loader" class="loader">
-Проверка...
+<div
+class="progress-container"
+id="progressContainer">
+
+<div
+class="progress-bar"
+id="progressBar">
+
+</div>
+
+</div>
+
+<div
+class="preview"
+id="preview">
+
+Предпросмотр файла появится здесь
+
 </div>
 
 </div>
@@ -89,23 +171,76 @@ margin-top:10px;
 
 <script>
 
-async function checkFile(){
-
-try{
+function showPreview(){
 
 const file=
-document.getElementById("file").files[0];
+document.getElementById(
+"file"
+).files[0];
+
+if(!file)return;
+
+document.getElementById(
+"preview"
+).innerHTML=
+`
+Имя файла:
+<b>${file.name}</b>
+<br><br>
+
+Размер:
+${(file.size/1024).toFixed(2)}
+KB
+`;
+}
+
+async function checkFile(){
+
+const file=
+document.getElementById(
+"file"
+).files[0];
 
 if(!file){
 
-alert("Выберите файл");
+alert(
+"Выберите файл"
+);
 
 return;
 }
 
+const progress=
 document.getElementById(
-"loader"
-).style.display="block";
+"progressContainer"
+);
+
+const bar=
+document.getElementById(
+"progressBar"
+);
+
+progress.style.display=
+"block";
+
+bar.style.width="10%";
+
+const fakeProgress=
+setInterval(()=>{
+
+let current=
+parseInt(
+bar.style.width
+);
+
+if(current<90){
+
+bar.style.width=
+(current+10)+"%";
+
+}
+
+},400);
 
 const formData=
 new FormData();
@@ -114,6 +249,8 @@ formData.append(
 "file",
 file
 );
+
+try{
 
 const response=
 await fetch(
@@ -124,66 +261,113 @@ body:formData
 }
 );
 
-if(!response.ok){
+bar.style.width=
+"100%";
 
-throw new Error(
-"Ошибка сервера: "+response.status
+clearInterval(
+fakeProgress
 );
-
-}
 
 const data=
 await response.json();
 
-let html=`
+let html=
+`
 
 <div class="card">
 
-<h3>${data.filename}</h3>
+<h3>
 
-<p>📊 Плагиат: <b>${data.plagiarism}%</b></p>
+${data.filename}
 
-<p>📚 Источник:
+</h3>
+
+<p>
+
+📊 Плагиат:
+<b>
+
+${data.plagiarism}%
+
+</b>
+
+</p>
+
+<p>
+
+✅ Уникальность:
+<b>
+
+${100-data.plagiarism}%
+
+</b>
+
+</p>
+
+<p>
+
+📚 Источник:
 ${data.source}
+
 </p>
 
-<p>❗ Ошибок:
+<p>
+
+❗ Ошибок:
 ${data.errors_count}
+
 </p>
 
-<p>⏱ Время:
-${data.time}
-сек
+<p>
+
+⏱ Время:
+${data.time} сек
+
 </p>
 
 </div>
+
 `;
 
-if(data.errors){
+if(data.errors.length>0){
 
 html+=`
+
 <div class="card">
 
-<h3>Ошибки</h3>
+<h3>
+
+Ошибки
+
+</h3>
+
 `;
 
-data.errors.forEach(e=>{
+data.errors.forEach(
+e=>{
 
 html+=`
 
 <div class="error">
 
-<b>${e.word}</b>
+<b>
+
+${e.word}
+
+</b>
 
 <br>
 
 ${e.message}
 
-<br>
+<br><br>
+
+Варианты:
 
 ${e.replacements.join(", ")}
 
 </div>
+
 `;
 
 });
@@ -193,22 +377,34 @@ html+=`</div>`;
 
 document.getElementById(
 "result"
-).innerHTML=html;
+).innerHTML=
+html;
+
+setTimeout(()=>{
+
+progress.style.display=
+"none";
+
+bar.style.width=
+"0%";
+
+},1000);
 
 }
-catch(error){
 
-alert(
-"Ошибка: "+error.message
+catch{
+
+clearInterval(
+fakeProgress
 );
 
-console.log(error);
+alert(
+"Ошибка подключения к серверу"
+);
 
+progress.style.display=
+"none";
 }
-
-document.getElementById(
-"loader"
-).style.display="none";
 
 }
 
