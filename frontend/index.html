@@ -16,11 +16,7 @@ body{
 margin:0;
 padding:0;
 font-family:Arial;
-background:linear-gradient(
-135deg,
-#0B3D91,
-#1E90FF
-);
+background:linear-gradient(135deg,#0B3D91,#1E90FF);
 color:white;
 }
 
@@ -63,79 +59,48 @@ background:#00A844;
 }
 
 .error{
-
 border-left:4px solid red;
-
 padding:10px;
-
 margin-top:10px;
-
 background:#fff0f0;
-
 cursor:pointer;
-
 border-radius:10px;
-
 }
 
 .error:hover{
-
 background:#ffdcdc;
-
 }
 
 .progress-container{
-
 display:none;
-
 width:100%;
-
 height:20px;
-
 background:#ddd;
-
 border-radius:30px;
-
 margin-top:15px;
-
 overflow:hidden;
-
 }
 
 .progress-bar{
-
 width:0%;
-
 height:100%;
-
 background:#00C853;
-
 transition:0.4s;
-
 }
 
 .preview{
-
 background:#f5f5f5;
-
 padding:10px;
-
 margin-top:10px;
-
 border-radius:10px;
-
 max-height:250px;
-
 overflow:auto;
-
 }
 
 .textContainer{
 
 line-height:1.8;
-
 white-space:pre-wrap;
-
 font-size:16px;
 
 height:350px;
@@ -157,12 +122,11 @@ scroll-behavior:smooth;
 .highlight{
 
 background:#ffeb3b;
-
 padding:2px;
-
 border-radius:4px;
-
 font-weight:bold;
+
+transition:0.5s;
 
 }
 
@@ -186,9 +150,7 @@ id="file"
 onchange="showPreview()">
 
 <button onclick="checkFile()">
-
 Проверить
-
 </button>
 
 <div
@@ -198,7 +160,6 @@ id="progressContainer">
 <div
 class="progress-bar"
 id="progressBar">
-
 </div>
 
 </div>
@@ -258,6 +219,7 @@ alert(
 );
 
 return;
+
 }
 
 const progress=
@@ -311,11 +273,12 @@ body:formData
 }
 );
 
-bar.style.width="100%";
-
 clearInterval(
 fakeProgress
 );
+
+bar.style.width=
+"100%";
 
 const data=
 await response.json();
@@ -343,6 +306,7 @@ escaped,
 
 text=
 text.replace(
+
 regex,
 
 `<span
@@ -357,51 +321,29 @@ ${error.word}
 
 });
 
-let html=
-
-`
+let html=`
 
 <div class="card">
 
-<h3>
-
-${data.filename}
-
-</h3>
+<h3>${data.filename}</h3>
 
 <p>
-
 📊 Плагиат:
-<b>
-
-${data.plagiarism}%
-
-</b>
-
+<b>${data.plagiarism}%</b>
 </p>
 
 <p>
-
 ✅ Уникальность:
-<b>
-
-${data.uniqueness}%
-
-</b>
-
+<b>${data.uniqueness}%</b>
 </p>
 
 <p>
-
 ❗ Ошибок:
 ${data.errors_count}
-
 </p>
 
 <p>
-
 ⏱ ${data.time} сек
-
 </p>
 
 </div>
@@ -410,9 +352,7 @@ ${data.errors_count}
 <div class="card">
 
 <h3>
-
 Текст документа
-
 </h3>
 
 <div
@@ -434,9 +374,7 @@ html+=`
 <div class="card">
 
 <h3>
-
 Ошибки
-
 </h3>
 
 `;
@@ -448,16 +386,10 @@ html+=`
 
 <div
 class="error"
-
 onclick="jumpToError(${index})"
-
 >
 
-<b>
-
-${e.word}
-
-</b>
+<b>${e.word}</b>
 
 <br>
 
@@ -484,6 +416,7 @@ document.getElementById(
 ).innerHTML=
 html;
 
+
 setTimeout(()=>{
 
 progress.style.display=
@@ -498,10 +431,6 @@ bar.style.width=
 
 catch{
 
-clearInterval(
-fakeProgress
-);
-
 alert(
 "Ошибка подключения"
 );
@@ -514,22 +443,32 @@ progress.style.display=
 }
 
 
+
 function jumpToError(index){
 
 const element=
-
 document.getElementById(
 "err"+index
 );
 
-const container=
+if(!element)return;
 
-document.getElementById(
-"textArea"
-);
+element.scrollIntoView({
 
-container.scrollTop=
-element.offsetTop-150;
+behavior:"smooth",
+block:"center"
+
+});
+
+element.style.background=
+"#ff9800";
+
+setTimeout(()=>{
+
+element.style.background=
+"#ffeb3b";
+
+},1000);
 
 }
 
