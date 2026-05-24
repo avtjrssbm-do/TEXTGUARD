@@ -33,8 +33,10 @@ app.add_middleware(
 # FOLDERS
 # ======================================================
 
-UPLOAD_FOLDER = "uploads"
-DATABASE_FOLDER = "documents_db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+DATABASE_FOLDER = os.path.join(BASE_DIR, "documents_db")
 
 API_URL = "https://api.languagetool.org/v2/check"
 
@@ -84,8 +86,9 @@ def load_pdf(path):
             if page_text:
                 text += page_text + "\n"
 
-        except:
-            pass
+        except Exception as e:
+
+            print("Ошибка PDF:", e)
 
     return text
 
@@ -107,7 +110,7 @@ def extract_text(path):
 
     except Exception as e:
 
-        print("Ошибка чтения:", e)
+        print("Ошибка чтения файла:", e)
 
     return ""
 
@@ -188,7 +191,9 @@ def check_spelling(text):
 
         data = response.json()
 
-    except:
+    except Exception as e:
+
+        print("Ошибка проверки:", e)
 
         return []
 
@@ -253,6 +258,8 @@ def check_plagiarism(text):
 
     files = os.listdir(DATABASE_FOLDER)
 
+    print("ФАЙЛЫ В БАЗЕ:", files)
+
     if len(files) == 0:
 
         return (
@@ -267,16 +274,24 @@ def check_plagiarism(text):
             file
         )
 
+        print("ПРОВЕРКА:", path)
+
         try:
 
             db_text = extract_text(path)
 
             if not db_text.strip():
+
+                print("Пустой текст:", file)
+
                 continue
 
             db_parts = split_text(db_text)
 
             if len(db_parts) == 0:
+
+                print("Нет частей:", file)
+
                 continue
 
             matches = 0
@@ -298,7 +313,6 @@ def check_plagiarism(text):
 
                 max_similarity = similarity.max()
 
-                # ЧУВСТВИТЕЛЬНОСТЬ
                 if max_similarity >= 0.3:
 
                     matches += 1
@@ -311,6 +325,8 @@ def check_plagiarism(text):
 
                 2
             )
+
+            print("СОВПАДЕНИЕ:", file, score)
 
             if score > best_score:
 
@@ -354,6 +370,8 @@ async def add_to_database(
             buffer
         )
 
+    print("ФАЙЛ ДОБАВЛЕН:", filepath)
+
     return {
 
         "message":
@@ -390,6 +408,8 @@ async def check(
             file.file,
             buffer
         )
+
+    print("ПРОВЕРЯЕМ:", filepath)
 
     text = extract_text(filepath)
 
@@ -442,6 +462,9 @@ def home():
     return {
 
         "status":
-        "TextGuard API running"
+        "TextGuard API running",
+
+        "database_path":
+        DATABASE_FOLDER
 
     }
