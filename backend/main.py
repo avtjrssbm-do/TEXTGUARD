@@ -106,7 +106,8 @@ def extract_text(path):
             return load_pdf(path)
 
     except Exception as e:
-        print(e)
+
+        print("Ошибка чтения:", e)
 
     return ""
 
@@ -159,6 +160,7 @@ def split_text(text):
         )
 
         if len(chunk) > 50:
+
             parts.append(chunk)
 
     return parts
@@ -187,6 +189,7 @@ def check_spelling(text):
         data = response.json()
 
     except:
+
         return []
 
     errors = []
@@ -248,7 +251,16 @@ def check_plagiarism(text):
     best_score = 0
     best_source = ""
 
-    for file in os.listdir(DATABASE_FOLDER):
+    files = os.listdir(DATABASE_FOLDER)
+
+    if len(files) == 0:
+
+        return (
+            0,
+            "База пуста"
+        )
+
+    for file in files:
 
         path = os.path.join(
             DATABASE_FOLDER,
@@ -259,46 +271,44 @@ def check_plagiarism(text):
 
             db_text = extract_text(path)
 
+            if not db_text.strip():
+                continue
+
             db_parts = split_text(db_text)
 
             if len(db_parts) == 0:
                 continue
 
-            all_texts = (
-                input_parts +
-                db_parts
-            )
-
-            vectorizer = TfidfVectorizer()
-
-            matrix = vectorizer.fit_transform(
-                all_texts
-            )
-
-            input_matrix = matrix[
-                :len(input_parts)
-            ]
-
-            db_matrix = matrix[
-                len(input_parts):
-            ]
-
-            similarity = cosine_similarity(
-                input_matrix,
-                db_matrix
-            )
-
             matches = 0
 
-            for row in similarity:
+            for input_chunk in input_parts:
 
-                if row.max() > 0.7:
+                texts = [input_chunk] + db_parts
+
+                vectorizer = TfidfVectorizer()
+
+                matrix = vectorizer.fit_transform(
+                    texts
+                )
+
+                similarity = cosine_similarity(
+                    matrix[0:1],
+                    matrix[1:]
+                )
+
+                max_similarity = similarity.max()
+
+                # ЧУВСТВИТЕЛЬНОСТЬ
+                if max_similarity >= 0.3:
+
                     matches += 1
 
             score = round(
+
                 matches /
                 len(input_parts)
                 * 100,
+
                 2
             )
 
@@ -309,7 +319,10 @@ def check_plagiarism(text):
 
         except Exception as e:
 
-            print(e)
+            print(
+                "Ошибка плагиата:",
+                e
+            )
 
     return (
         best_score,
@@ -344,7 +357,7 @@ async def add_to_database(
     return {
 
         "message":
-        "Файл добавлен",
+        "Файл добавлен в базу",
 
         "filename":
         file.filename

@@ -10,69 +10,201 @@
 
 <style>
 
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}
+
 body{
 background:#f2f5fb;
-font-family:Arial;
-padding:20px;
+padding:15px;
 }
 
 .container{
-max-width:600px;
+max-width:500px;
 margin:auto;
+}
+
+.header{
+display:flex;
+align-items:center;
+margin-bottom:20px;
+}
+
+.title{
+font-size:26px;
+font-weight:bold;
+color:#111;
 }
 
 .card{
 background:white;
+border-radius:25px;
 padding:20px;
-border-radius:20px;
-margin-bottom:20px;
-box-shadow:0 4px 10px rgba(0,0,0,.1);
+margin-bottom:15px;
+box-shadow:0 4px 15px rgba(0,0,0,.08);
 }
 
-button{
-width:100%;
-padding:15px;
-border:none;
-border-radius:12px;
-margin-top:10px;
-font-size:16px;
-font-weight:bold;
-cursor:pointer;
-color:white;
+.uploadCard{
+text-align:center;
+}
+
+.uploadArea{
+border:2px dashed #d8e2ff;
+border-radius:25px;
+padding:30px;
+background:#fafcff;
+margin-bottom:20px;
+transition:.3s;
+}
+
+.uploadArea:hover{
+border-color:#2962ff;
+}
+
+.uploadIcon{
+font-size:60px;
+color:#2962ff;
+margin-bottom:15px;
+}
+
+.uploadArea h3{
+margin-bottom:10px;
+color:#222;
+}
+
+.uploadArea p{
+color:#777;
+margin:5px 0;
+}
+
+.formats{
+font-size:13px;
+color:#999;
 }
 
 .chooseBtn{
 background:#2962ff;
-}
-
-.addBtn{
-background:#ff9800;
+width:220px;
+margin:auto;
+margin-top:15px;
 }
 
 .checkBtn{
-background:#00c853;
+background:#00C853;
+margin-top:15px;
 }
 
-.error{
-background:#fff3f3;
+button{
+padding:14px;
+border:none;
+border-radius:12px;
+color:white;
+font-size:16px;
+font-weight:bold;
+cursor:pointer;
+width:100%;
+transition:.3s;
+}
+
+button:active{
+transform:scale(.98);
+}
+
+.fileName{
+margin-top:15px;
+padding:12px;
+background:#f5f7ff;
+border-radius:12px;
+font-size:14px;
+font-weight:bold;
+color:#555;
+border:1px solid #dce6ff;
+}
+
+.stats{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+}
+
+.stat{
 padding:15px;
-border-radius:10px;
-margin-top:10px;
-border-left:5px solid red;
+border-radius:15px;
+background:white;
+border:1px solid #eee;
 }
 
-.highlight{
-background:yellow;
+.big{
+font-size:28px;
+font-weight:bold;
+margin-bottom:5px;
+}
+
+.green{
+color:#00C853;
+}
+
+.red{
+color:#ff4444;
+}
+
+.orange{
+color:#ff9800;
+}
+
+.blue{
+color:#2962ff;
 }
 
 .textBox{
-max-height:300px;
-overflow:auto;
-line-height:1.7;
+height:350px;
+overflow-y:auto;
+line-height:1.8;
 padding:15px;
-border:1px solid #ddd;
-border-radius:10px;
 background:#fafafa;
+border-radius:15px;
+border:1px solid #ddd;
+scroll-behavior:smooth;
+}
+
+.highlight{
+background:#ffe84f;
+padding:2px;
+border-radius:4px;
+transition:.5s;
+}
+
+.error{
+padding:15px;
+margin-top:10px;
+background:#fff5f5;
+border-radius:12px;
+cursor:pointer;
+border-left:5px solid red;
+transition:.3s;
+}
+
+.error:hover{
+transform:scale(1.02);
+}
+
+.progress{
+display:none;
+margin-top:10px;
+height:10px;
+background:#ddd;
+border-radius:20px;
+overflow:hidden;
+}
+
+.bar{
+width:0%;
+height:100%;
+background:#2962ff;
+transition:.3s;
 }
 
 </style>
@@ -83,11 +215,33 @@ background:#fafafa;
 
 <div class="container">
 
-<div class="card">
+<div class="header">
 
-<h1>TextGuard</h1>
+<div class="title">
+TextGuard
+</div>
 
-<br>
+</div>
+
+<div class="card uploadCard">
+
+<div class="uploadArea">
+
+<div class="uploadIcon">
+☁
+</div>
+
+<h3>
+Перетащите файл сюда
+</h3>
+
+<p>
+или выберите файл
+</p>
+
+<p class="formats">
+Поддерживаются: .txt .docx .pdf
+</p>
 
 <input
 type="file"
@@ -103,12 +257,14 @@ onclick="document.getElementById('file').click()"
 Выбрать файл
 </button>
 
-<button
-class="addBtn"
-onclick="addToDatabase()"
+<div
+class="fileName"
+id="selectedFile"
 >
-Добавить в базу
-</button>
+Файл не выбран
+</div>
+
+</div>
 
 <button
 class="checkBtn"
@@ -117,10 +273,16 @@ onclick="checkFile()"
 Проверить текст
 </button>
 
-<br><br>
+<div
+class="progress"
+id="progress"
+>
 
-<div id="selectedFile">
-Файл не выбран
+<div
+class="bar"
+id="bar"
+></div>
+
 </div>
 
 </div>
@@ -131,74 +293,27 @@ onclick="checkFile()"
 
 <script>
 
-const API =
-"https://textguard-ychm.onrender.com";
-
-
 function showFileName(){
 
-const file =
+const file=
 document.getElementById(
 "file"
 ).files[0];
 
+const label=
 document.getElementById(
 "selectedFile"
-).innerHTML = file
-? file.name
-: "Файл не выбран";
-
-}
-
-
-async function addToDatabase(){
-
-const file =
-document.getElementById(
-"file"
-).files[0];
-
-if(!file){
-
-alert("Выберите файл");
-
-return;
-
-}
-
-const formData =
-new FormData();
-
-formData.append(
-"file",
-file
 );
 
-try{
+if(file){
 
-const response =
-await fetch(
-API + "/add_to_database",
-{
-method:"POST",
-body:formData
-}
-);
+label.innerHTML=
+file.name;
 
-const data =
-await response.json();
+}else{
 
-alert(
-"Файл добавлен:\n" +
-data.filename
-);
-
-}
-catch{
-
-alert(
-"Ошибка добавления"
-);
+label.innerHTML=
+"Файл не выбран";
 
 }
 
@@ -207,7 +322,7 @@ alert(
 
 async function checkFile(){
 
-const file =
+const file=
 document.getElementById(
 "file"
 ).files[0];
@@ -222,7 +337,36 @@ return;
 
 }
 
-const formData =
+const progress=
+document.getElementById(
+"progress"
+);
+
+const bar=
+document.getElementById(
+"bar"
+);
+
+progress.style.display=
+"block";
+
+let val=0;
+
+let fake=
+setInterval(()=>{
+
+if(val<90){
+
+val+=10;
+
+bar.style.width=
+val+"%";
+
+}
+
+},300);
+
+const formData=
 new FormData();
 
 formData.append(
@@ -232,83 +376,80 @@ file
 
 try{
 
-const response =
+const response=
 await fetch(
-API + "/check",
+"https://textguard-ychm.onrender.com/check",
 {
 method:"POST",
 body:formData
 }
 );
 
-const data =
+const data=
 await response.json();
 
-let text =
-data.text;
+clearInterval(fake);
+
+bar.style.width="100%";
+
+let text=data.text;
 
 data.errors.forEach((e,i)=>{
 
-let safe =
-e.word.replace(
+let safe=e.word.replace(
 /[.*+?^${}()|[\]\\]/g,
 '\\$&'
 );
 
-text =
-text.replace(
+text=text.replace(
 
 new RegExp(
 safe,
 "i"
 ),
 
-`<span class="highlight" id="err${i}">
-${e.word}
-</span>`
+`<span class="highlight" id="err${i}">${e.word}</span>`
 
 );
 
 });
 
-let html = `
+let html=`
+
+<div class="stats">
+
+<div class="stat">
+<div class="big green">${data.uniqueness}%</div>
+Уникальность
+</div>
+
+<div class="stat">
+<div class="big red">${data.plagiarism}%</div>
+Плагиат
+</div>
+
+<div class="stat">
+<div class="big orange">${data.errors_count}</div>
+Ошибки
+</div>
+
+<div class="stat">
+<div class="big blue">${data.time}</div>
+сек
+</div>
+
+</div>
 
 <div class="card">
 
-<h2>Результат</h2>
-
-<br>
-
-<p>
-<b>Уникальность:</b>
-${data.uniqueness}%
-</p>
-
-<br>
-
-<p>
-<b>Плагиат:</b>
-${data.plagiarism}%
-</p>
-
-<br>
-
-<p>
-<b>Источник:</b>
-${data.source}
-</p>
-
-<br>
-
-<p>
-<b>Ошибок:</b>
-${data.errors_count}
-</p>
+<h3>Текст документа</h3>
 
 <br>
 
 <div class="textBox">
+
 ${text}
+
 </div>
 
 </div>
@@ -317,15 +458,13 @@ ${text}
 
 if(data.errors.length){
 
-html += `
-<div class="card">
+html+=`<div class="card">
 
-<h2>Ошибки</h2>
-`;
+<h3>Ошибки</h3>`;
 
 data.errors.forEach((e,i)=>{
 
-html += `
+html+=`
 
 <div
 class="error"
@@ -348,16 +487,27 @@ ${e.replacements.join(", ")}
 
 });
 
-html += `</div>`;
+html+=`</div>`;
 
 }
 
 document.getElementById(
 "result"
-).innerHTML =
+).innerHTML=
 html;
 
+setTimeout(()=>{
+
+progress.style.display=
+"none";
+
+bar.style.width=
+"0%";
+
+},1000);
+
 }
+
 catch{
 
 alert(
@@ -371,7 +521,7 @@ alert(
 
 function jumpToError(index){
 
-const element =
+const element=
 document.getElementById(
 "err"+index
 );
@@ -385,6 +535,16 @@ behavior:"smooth",
 block:"center"
 
 });
+
+element.style.background=
+"#ff9800";
+
+setTimeout(()=>{
+
+element.style.background=
+"#ffe84f";
+
+},1500);
 
 }
 
