@@ -23,10 +23,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_FOLDER="uploads"
-DATABASE_FOLDER="documents_db"
+UPLOAD_FOLDER = "uploads"
+DATABASE_FOLDER = "documents_db"
 
-API_URL="https://api.languagetool.org/v2/check"
+API_URL = "https://api.languagetool.org/v2/check"
 
 os.makedirs(
     UPLOAD_FOLDER,
@@ -38,6 +38,10 @@ os.makedirs(
     exist_ok=True
 )
 
+
+# ==========================
+# ЧТЕНИЕ ФАЙЛОВ
+# ==========================
 
 def load_txt(path):
 
@@ -53,45 +57,61 @@ def load_txt(path):
 
 def load_docx(path):
 
-    doc=Document(path)
+    doc = Document(path)
 
-    return "\n".join(
+    text = []
 
-        p.text
+    for p in doc.paragraphs:
 
-        for p in doc.paragraphs
+        if p.text.strip():
 
-    )
+            text.append(
+                p.text
+            )
+
+    return "\n".join(text)
 
 
 def load_pdf(path):
 
-    reader=PdfReader(path)
+    reader = PdfReader(path)
 
-    text=""
+    text = ""
 
     for page in reader.pages:
 
-        text+=page.extract_text() or ""
+        try:
+
+            page_text = page.extract_text()
+
+            if page_text:
+
+                text += page_text + "\n"
+
+        except:
+
+            pass
 
     return text
 
 
 def extract_text(path):
 
-    ext=os.path.splitext(path)[1].lower()
+    ext = os.path.splitext(
+        path
+    )[1].lower()
 
     try:
 
-        if ext==".txt":
+        if ext == ".txt":
 
             return load_txt(path)
 
-        elif ext==".docx":
+        elif ext == ".docx":
 
             return load_docx(path)
 
-        elif ext==".pdf":
+        elif ext == ".pdf":
 
             return load_pdf(path)
 
@@ -106,18 +126,45 @@ def extract_text(path):
     return ""
 
 
+# ==========================
+# ОЧИСТКА
+# ==========================
+
+def clean_text(text):
+
+    text = text.lower()
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
+
+    text = re.sub(
+        r"[^\w\s]",
+        "",
+        text
+    )
+
+    return text.strip()
+
+
+# ==========================
+# ПРОВЕРКА ОШИБОК
+# ==========================
+
 def check_spelling(text):
 
     try:
 
-        response=requests.post(
+        response = requests.post(
 
             API_URL,
 
             data={
 
-                "text":text,
-                "language":"ru"
+                "text": text,
+                "language": "ru"
 
             },
 
@@ -125,27 +172,29 @@ def check_spelling(text):
 
         )
 
-        data=response.json()
+        data = response.json()
 
     except:
 
         return []
 
-    errors=[]
-    seen=set()
+    errors = []
+
+    seen = set()
 
     for m in data.get(
         "matches",
         []
     ):
 
-        word=text[
+        word = text[
             m["offset"]:
-            m["offset"]+
+            m["offset"] +
             m["length"]
         ]
 
         if word in seen:
+
             continue
 
         seen.add(word)
@@ -169,75 +218,79 @@ def check_spelling(text):
                 )[:5]
 
             ]
-
         })
 
     return errors
 
 
-def clean_text(text):
-
-    text=text.lower()
-
-    text=re.sub(
-        r"\s+",
-        " ",
-        text
-    )
-
-    text=re.sub(
-        r"[^\w\s]",
-        "",
-        text
-    )
-
-    return text.strip()
-
+# ==========================
+# ПЛАГИАТ
+# ==========================
 
 def check_plagiarism(text):
 
     docs=[]
 
-    input_text=clean_text(text)
+    input_text=clean_text(
+        text
+    )
 
-    for filename in os.listdir(
+    print("\nБАЗА:")
+
+    for root, dirs, files in os.walk(
         DATABASE_FOLDER
     ):
 
-        path=os.path.join(
-            DATABASE_FOLDER,
-            filename
-        )
+        for filename in files:
 
-        try:
-
-            content=extract_text(
-                path
+            path=os.path.join(
+                root,
+                filename
             )
 
-            content=clean_text(
-                content
-            )
+            ext=os.path.splitext(
+                filename
+            )[1].lower()
 
-            if content:
+            if ext not in [
+                ".txt",
+                ".docx",
+                ".pdf"
+            ]:
 
-                docs.append(
-                    (
-                        filename,
-                        content
-                    )
+                continue
+
+            try:
+
+                content=extract_text(
+                    path
                 )
 
-        except Exception as e:
+                content=clean_text(
+                    content
+                )
 
-            print(
-                "Ошибка:",
-                filename,
-                e
-            )
+                if len(content)>20:
 
-            continue
+                    docs.append(
+                        (
+                            filename,
+                            content
+                        )
+                    )
 
+                    print(
+                        "✓",
+                        filename
+                    )
+
+            except Exception as e:
+
+                print(
+                    "Ошибка:",
+                    filename,
+                    e
+                )
 
     if not docs:
 
@@ -247,7 +300,7 @@ def check_plagiarism(text):
         )
 
 
-    # проверка на почти полное совпадение
+    # полное совпадение
 
     for filename,content in docs:
 
@@ -275,7 +328,8 @@ def check_plagiarism(text):
     vectorizer=TfidfVectorizer(
 
         ngram_range=(1,3),
-        max_features=30000
+
+        max_features=50000
 
     )
 
@@ -294,27 +348,34 @@ def check_plagiarism(text):
 
 
     score=float(
+
         similarity.max()
+
     )*100
 
 
     index=similarity.argmax()
 
-    source=docs[index][0]
+    source=docs[
+        index
+    ][0]
 
 
     return(
 
         round(score,2),
         source
-
     )
 
+
+# ==========================
+# API
+# ==========================
 
 @app.get("/")
 def home():
 
-    return{
+    return {
 
         "status":
         "TextGuard API running"
@@ -346,7 +407,6 @@ async def check(
             buffer
         )
 
-
     text=extract_text(
         filepath
     )
@@ -359,7 +419,7 @@ async def check(
         text
     )
 
-    return{
+    return {
 
         "filename":
         file.filename,
