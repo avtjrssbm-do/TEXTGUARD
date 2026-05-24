@@ -2,7 +2,6 @@
 <html lang="ru">
 
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
@@ -54,10 +53,6 @@ font-size:16px;
 cursor:pointer;
 }
 
-button:hover{
-background:#00A844;
-}
-
 .error{
 border-left:4px solid red;
 padding:10px;
@@ -98,36 +93,29 @@ overflow:auto;
 }
 
 .textContainer{
-
 line-height:1.8;
 white-space:pre-wrap;
 font-size:16px;
-
 height:350px;
-
 overflow-y:auto;
-
 padding:15px;
-
 border:1px solid #ddd;
-
 border-radius:10px;
-
 background:white;
-
 scroll-behavior:smooth;
-
+position:relative;
 }
 
 .highlight{
-
 background:#ffeb3b;
 padding:2px;
 border-radius:4px;
 font-weight:bold;
-
 transition:0.5s;
+}
 
+.activeError{
+background:#ff9800 !important;
 }
 
 </style>
@@ -203,7 +191,6 @@ ${(file.size/1024).toFixed(2)} KB
 `;
 
 }
-
 
 async function checkFile(){
 
@@ -306,17 +293,8 @@ escaped,
 
 text=
 text.replace(
-
 regex,
-
-`<span
-id="${id}"
-class="highlight">
-
-${error.word}
-
-</span>`
-
+`<span id="${id}" class="highlight">${error.word}</span>`
 );
 
 });
@@ -327,33 +305,21 @@ let html=`
 
 <h3>${data.filename}</h3>
 
-<p>
-📊 Плагиат:
-<b>${data.plagiarism}%</b>
-</p>
+<p>📊 Плагиат: <b>${data.plagiarism}%</b></p>
 
-<p>
-✅ Уникальность:
-<b>${data.uniqueness}%</b>
-</p>
+<p>✅ Уникальность:
+<b>${data.uniqueness}%</b></p>
 
-<p>
-❗ Ошибок:
-${data.errors_count}
-</p>
+<p>❗ Ошибок:
+${data.errors_count}</p>
 
-<p>
-⏱ ${data.time} сек
-</p>
+<p>⏱ ${data.time} сек</p>
 
 </div>
 
-
 <div class="card">
 
-<h3>
-Текст документа
-</h3>
+<h3>Текст документа</h3>
 
 <div
 class="textContainer"
@@ -373,9 +339,7 @@ html+=`
 
 <div class="card">
 
-<h3>
-Ошибки
-</h3>
+<h3>Ошибки</h3>
 
 `;
 
@@ -386,8 +350,7 @@ html+=`
 
 <div
 class="error"
-onclick="jumpToError(${index})"
->
+onclick="jumpToError(${index})">
 
 <b>${e.word}</b>
 
@@ -416,7 +379,6 @@ document.getElementById(
 ).innerHTML=
 html;
 
-
 setTimeout(()=>{
 
 progress.style.display=
@@ -443,7 +405,6 @@ progress.style.display=
 }
 
 
-
 function jumpToError(index){
 
 const element=
@@ -451,24 +412,31 @@ document.getElementById(
 "err"+index
 );
 
+const container=
+document.getElementById(
+"textArea"
+);
+
 if(!element)return;
 
-element.scrollIntoView({
+document
+.querySelectorAll(
+".highlight"
+)
+.forEach(
+x=>x.classList.remove(
+"activeError"
+)
+);
 
-behavior:"smooth",
-block:"center"
+element.classList.add(
+"activeError"
+);
 
-});
-
-element.style.background=
-"#ff9800";
-
-setTimeout(()=>{
-
-element.style.background=
-"#ffeb3b";
-
-},1000);
+container.scrollTop=
+element.offsetTop-
+container.offsetTop-
+120;
 
 }
 
