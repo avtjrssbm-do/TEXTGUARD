@@ -9,8 +9,7 @@ import requests
 import re
 import time
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from difflib import SequenceMatcher
 
 
 app=FastAPI()
@@ -39,9 +38,9 @@ os.makedirs(
 )
 
 
-# ======================
+# =========================
 # ЧТЕНИЕ ФАЙЛОВ
-# ======================
+# =========================
 
 def load_txt(path):
 
@@ -80,9 +79,14 @@ def load_pdf(path):
 
         try:
 
-            text+=page.extract_text() or ""
+            page_text=page.extract_text()
+
+            if page_text:
+
+                text+=page_text+"\n"
 
         except:
+
             pass
 
     return text
@@ -107,28 +111,18 @@ def extract_text(path):
 
     except Exception as e:
 
-        print(
-            "Ошибка:",
-            path,
-            e
-        )
+        print("Ошибка:",e)
 
     return ""
 
 
-# ======================
-# ОЧИСТКА
-# ======================
+# =========================
+# ОЧИСТКА ТЕКСТА
+# =========================
 
 def clean_text(text):
 
     text=text.lower()
-
-    text=re.sub(
-        r"\s+",
-        " ",
-        text
-    )
 
     text=re.sub(
         r"[^\w\s]",
@@ -136,12 +130,18 @@ def clean_text(text):
         text
     )
 
+    text=re.sub(
+        r"\s+",
+        " ",
+        text
+    )
+
     return text.strip()
 
 
-# ======================
+# =========================
 # ПРОВЕРКА ОШИБОК
-# ======================
+# =========================
 
 def check_spelling(text):
 
@@ -181,7 +181,6 @@ def check_spelling(text):
         ]
 
         if word in seen:
-
             continue
 
         seen.add(word)
@@ -205,22 +204,24 @@ def check_spelling(text):
                 )[:5]
 
             ]
+
         })
 
     return errors
 
 
-# ======================
+# =========================
 # ПЛАГИАТ
-# ======================
+# =========================
 
 def check_plagiarism(text):
-
-    docs=[]
 
     input_text=clean_text(
         text
     )
+
+    max_score=0
+    source=""
 
     for root,dirs,files in os.walk(
         DATABASE_FOLDER
@@ -233,117 +234,57 @@ def check_plagiarism(text):
                 filename
             )
 
-            try:
+            content=extract_text(
+                path
+            )
 
-                content=extract_text(
-                    path
-                )
+            content=clean_text(
+                content
+            )
 
-                content=clean_text(
-                    content
-                )
-
-                if content:
-
-                    docs.append(
-                        (
-                            filename,
-                            content
-                        )
-                    )
-
-            except:
+            if not content:
 
                 continue
 
 
-    if not docs:
+            # точное совпадение
 
-        return(
-            0,
-            "База пуста"
-        )
+            if content==input_text:
+
+                return(
+                    100,
+                    filename
+                )
 
 
-    # ТОЧНОЕ совпадение
+            similarity=SequenceMatcher(
+                None,
+                input_text,
+                content
+            ).ratio()
 
-    for filename,content in docs:
 
-        if content==input_text:
-
-            return(
-                100,
-                filename
+            score=round(
+                similarity*100,
+                2
             )
 
 
-    # TF-IDF сравнение
+            if score>max_score:
 
-    texts=[
-
-        x[1]
-
-        for x in docs
-
-    ]+[
-
-        input_text
-
-    ]
-
-
-    vectorizer=TfidfVectorizer(
-
-        ngram_range=(1,2)
-
-    )
-
-
-    matrix=vectorizer.fit_transform(
-        texts
-    )
-
-
-    similarity=cosine_similarity(
-
-        matrix[-1],
-        matrix[:-1]
-
-    )
-
-
-    score=float(
-        similarity.max()
-    )*100
-
-
-    index=similarity.argmax()
-
-    source=docs[
-        index
-    ][0]
+                max_score=score
+                source=filename
 
 
     return(
-
-        round(score,2),
+        max_score,
         source
     )
 
 
-# ======================
+# =========================
 # API
-# ======================
-
-@app.get("/")
-def home():
-
-    return{
-
-        "status":
-        "TextGuard API running"
-    }
-
+# =========================
 
 @app.post("/check")
 async def check(
@@ -411,4 +352,14 @@ async def check(
             2
         )
 
+    }
+
+
+@app.get("/")
+def home():
+
+    return{
+
+        "status":
+        "TextGuard API running"
     }
