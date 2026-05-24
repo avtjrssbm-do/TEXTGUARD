@@ -12,7 +12,7 @@ import time
 from difflib import SequenceMatcher
 
 
-app=FastAPI()
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,9 +38,9 @@ os.makedirs(
 )
 
 
-# =========================
+# ====================
 # ЧТЕНИЕ ФАЙЛОВ
-# =========================
+# ====================
 
 def load_txt(path):
 
@@ -86,7 +86,6 @@ def load_pdf(path):
                 text+=page_text+"\n"
 
         except:
-
             pass
 
     return text
@@ -111,14 +110,17 @@ def extract_text(path):
 
     except Exception as e:
 
-        print("Ошибка:",e)
+        print(
+            "Ошибка:",
+            e
+        )
 
     return ""
 
 
-# =========================
+# ====================
 # ОЧИСТКА ТЕКСТА
-# =========================
+# ====================
 
 def clean_text(text):
 
@@ -139,9 +141,9 @@ def clean_text(text):
     return text.strip()
 
 
-# =========================
+# ====================
 # ПРОВЕРКА ОШИБОК
-# =========================
+# ====================
 
 def check_spelling(text):
 
@@ -210,9 +212,9 @@ def check_spelling(text):
     return errors
 
 
-# =========================
+# ====================
 # ПЛАГИАТ
-# =========================
+# ====================
 
 def check_plagiarism(text):
 
@@ -220,8 +222,24 @@ def check_plagiarism(text):
         text
     )
 
+    input_parts=re.split(
+        r"[.!?\n]+",
+        input_text
+    )
+
+    input_parts=[
+
+        x.strip()
+
+        for x in input_parts
+
+        if len(x.strip())>20
+
+    ]
+
     max_score=0
     source=""
+
 
     for root,dirs,files in os.walk(
         DATABASE_FOLDER
@@ -234,46 +252,96 @@ def check_plagiarism(text):
                 filename
             )
 
-            content=extract_text(
-                path
-            )
+            try:
 
-            content=clean_text(
-                content
-            )
-
-            if not content:
-
-                continue
-
-
-            # точное совпадение
-
-            if content==input_text:
-
-                return(
-                    100,
-                    filename
+                content=extract_text(
+                    path
                 )
 
+                content=clean_text(
+                    content
+                )
 
-            similarity=SequenceMatcher(
-                None,
-                input_text,
-                content
-            ).ratio()
-
-
-            score=round(
-                similarity*100,
-                2
-            )
+                if not content:
+                    continue
 
 
-            if score>max_score:
+                # точное совпадение
 
-                max_score=score
-                source=filename
+                if content==input_text:
+
+                    return(
+                        100,
+                        filename
+                    )
+
+
+                db_parts=re.split(
+                    r"[.!?\n]+",
+                    content
+                )
+
+                db_parts=[
+
+                    x.strip()
+
+                    for x in db_parts
+
+                    if len(x.strip())>20
+
+                ]
+
+
+                matches=0
+
+
+                for part in input_parts:
+
+                    for db_part in db_parts:
+
+                        similarity=SequenceMatcher(
+
+                            None,
+                            part,
+                            db_part
+
+                        ).ratio()
+
+
+                        if similarity>=0.8:
+
+                            matches+=1
+                            break
+
+
+                if len(input_parts)>0:
+
+                    score=round(
+
+                        matches/
+                        len(input_parts)
+                        *100,
+
+                        2
+                    )
+
+                else:
+
+                    score=0
+
+
+                if score>max_score:
+
+                    max_score=score
+                    source=filename
+
+
+            except Exception as e:
+
+                print(
+                    "Ошибка:",
+                    e
+                )
 
 
     return(
@@ -282,9 +350,9 @@ def check_plagiarism(text):
     )
 
 
-# =========================
+# ====================
 # API
-# =========================
+# ====================
 
 @app.post("/check")
 async def check(
