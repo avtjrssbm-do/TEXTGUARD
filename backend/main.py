@@ -9,11 +9,12 @@ import requests
 import re
 import time
 
+from difflib import SequenceMatcher
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-app = FastAPI()
+app=FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,10 +24,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_FOLDER = "uploads"
-DATABASE_FOLDER = "documents_db"
+UPLOAD_FOLDER="uploads"
+DATABASE_FOLDER="documents_db"
 
-API_URL = "https://api.languagetool.org/v2/check"
+API_URL="https://api.languagetool.org/v2/check"
 
 os.makedirs(
     UPLOAD_FOLDER,
@@ -38,6 +39,10 @@ os.makedirs(
     exist_ok=True
 )
 
+
+# =====================
+# ЧТЕНИЕ ФАЙЛОВ
+# =====================
 
 def load_txt(path):
 
@@ -53,19 +58,12 @@ def load_txt(path):
 
 def load_docx(path):
 
-    doc = Document(path)
+    doc=Document(path)
 
-    text=[]
-
-    for p in doc.paragraphs:
-
-        if p.text.strip():
-
-            text.append(
-                p.text
-            )
-
-    return "\n".join(text)
+    return "\n".join(
+        p.text
+        for p in doc.paragraphs
+    )
 
 
 def load_pdf(path):
@@ -78,14 +76,12 @@ def load_pdf(path):
 
         try:
 
-            page_text=page.extract_text()
-
-            if page_text:
-
-                text+=page_text+"\n"
+            text+=(
+                page.extract_text()
+                or ""
+            )
 
         except:
-
             pass
 
     return text
@@ -100,21 +96,18 @@ def extract_text(path):
     try:
 
         if ext==".txt":
-
             return load_txt(path)
 
         elif ext==".docx":
-
             return load_docx(path)
 
         elif ext==".pdf":
-
             return load_pdf(path)
 
     except Exception as e:
 
         print(
-            "Ошибка чтения:",
+            "Ошибка:",
             path,
             e
         )
@@ -122,9 +115,19 @@ def extract_text(path):
     return ""
 
 
+# =====================
+# ОЧИСТКА ТЕКСТА
+# =====================
+
 def clean_text(text):
 
     text=text.lower()
+
+    text=re.sub(
+        r"[^\w\s]",
+        " ",
+        text
+    )
 
     text=re.sub(
         r"\s+",
@@ -132,32 +135,24 @@ def clean_text(text):
         text
     )
 
-    text=re.sub(
-        r"[^\w\s]",
-        "",
-        text
-    )
-
     return text.strip()
 
+
+# =====================
+# ОШИБКИ
+# =====================
 
 def check_spelling(text):
 
     try:
 
         response=requests.post(
-
             API_URL,
-
             data={
-
                 "text":text,
                 "language":"ru"
-
             },
-
             timeout=15
-
         )
 
         data=response.json()
@@ -167,7 +162,6 @@ def check_spelling(text):
         return []
 
     errors=[]
-
     seen=set()
 
     for m in data.get(
@@ -182,12 +176,9 @@ def check_spelling(text):
         ]
 
         if word in seen:
-
             continue
 
-        seen.add(
-            word
-        )
+        seen.add(word)
 
         errors.append({
 
@@ -214,6 +205,10 @@ def check_spelling(text):
     return errors
 
 
+# =====================
+# ПЛАГИАТ
+# =====================
+
 def check_plagiarism(text):
 
     docs=[]
@@ -222,7 +217,7 @@ def check_plagiarism(text):
         text
     )
 
-    print("\n===== БАЗА =====")
+    print("\n====== БАЗА ======")
 
     for root,dirs,files in os.walk(
         DATABASE_FOLDER
@@ -244,41 +239,29 @@ def check_plagiarism(text):
                 ".docx",
                 ".pdf"
             ]:
-
                 continue
 
-            try:
+            content=extract_text(
+                path
+            )
 
-                content=extract_text(
-                    path
-                )
+            content=clean_text(
+                content
+            )
 
-                content=clean_text(
-                    content
-                )
+            if len(content)>10:
 
-                if len(content)>0:
-
-                    docs.append(
-                        (
-                            filename,
-                            content
-                        )
+                docs.append(
+                    (
+                        filename,
+                        content
                     )
-
-                    print(
-                        "✓",
-                        filename
-                    )
-
-            except Exception as e:
+                )
 
                 print(
-                    "Ошибка:",
-                    filename,
-                    e
+                    "✓",
+                    filename
                 )
-
 
     if not docs:
 
@@ -288,11 +271,11 @@ def check_plagiarism(text):
         )
 
 
-    # точное совпадение
+    # Полное совпадение
 
     for filename,content in docs:
 
-        if content==input_text:
+        if input_text==content:
 
             return(
                 100,
@@ -300,55 +283,69 @@ def check_plagiarism(text):
             )
 
 
+    # Почти полное совпадение
+
+    best_score=0
+    best_file=""
+
+    for filename,content in docs:
+
+        score=SequenceMatcher(
+            None,
+            input_text,
+            content
+        ).ratio()*100
+
+        if score>best_score:
+
+            best_score=score
+            best_file=filename
+
+
+    # TF-IDF дополнительная проверка
+
     all_texts=[
 
-        d[1]
+        x[1]
 
-        for d in docs
-
-    ]+[
-
-        input_text
+        for x in docs
 
     ]
 
-
-    vectorizer=TfidfVectorizer(
-
-        analyzer="char_wb",
-        ngram_range=(3,5)
-
+    all_texts.append(
+        input_text
     )
 
+    vectorizer=TfidfVectorizer()
 
     tfidf=vectorizer.fit_transform(
         all_texts
     )
 
-
-    similarity=cosine_similarity(
-
+    sim=cosine_similarity(
         tfidf[-1],
         tfidf[:-1]
-
     )
 
-
-    score=float(
-        similarity.max()
+    tfidf_score=float(
+        sim.max()
     )*100
 
 
-    index=similarity.argmax()
-
-    source=docs[index][0]
-
-    return(
-
-        round(score,2),
-        source
+    final_score=max(
+        best_score,
+        tfidf_score
     )
 
+    return(
+        round(final_score,2),
+        best_file
+    )
+
+
+# =====================
+# API
+# =====================
 
 @app.get("/")
 def home():
@@ -368,7 +365,6 @@ async def check(
     start=time.time()
 
     filepath=os.path.join(
-
         UPLOAD_FOLDER,
         file.filename
     )
@@ -383,7 +379,6 @@ async def check(
             buffer
         )
 
-
     text=extract_text(
         filepath
     )
@@ -395,7 +390,6 @@ async def check(
     plagiarism,source=check_plagiarism(
         text
     )
-
 
     return{
 
