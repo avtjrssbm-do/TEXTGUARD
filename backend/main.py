@@ -39,9 +39,9 @@ os.makedirs(
 )
 
 
-# ==========================
+# =====================================
 # ЧТЕНИЕ ФАЙЛОВ
-# ==========================
+# =====================================
 
 def load_txt(path):
 
@@ -80,7 +80,11 @@ def load_pdf(path):
 
         try:
 
-            text+=page.extract_text() or ""
+            page_text=page.extract_text()
+
+            if page_text:
+
+                text+=page_text+"\n"
 
         except:
             pass
@@ -94,21 +98,27 @@ def extract_text(path):
         path
     )[1].lower()
 
-    if ext==".txt":
-        return load_txt(path)
+    try:
 
-    elif ext==".docx":
-        return load_docx(path)
+        if ext==".txt":
+            return load_txt(path)
 
-    elif ext==".pdf":
-        return load_pdf(path)
+        elif ext==".docx":
+            return load_docx(path)
+
+        elif ext==".pdf":
+            return load_pdf(path)
+
+    except Exception as e:
+
+        print(e)
 
     return ""
 
 
-# ==========================
+# =====================================
 # ОЧИСТКА
-# ==========================
+# =====================================
 
 def clean_text(text):
 
@@ -116,7 +126,7 @@ def clean_text(text):
 
     text=re.sub(
         r"[^\w\s]",
-        "",
+        " ",
         text
     )
 
@@ -129,20 +139,64 @@ def clean_text(text):
     return text.strip()
 
 
-# ==========================
+# =====================================
+# РАЗБИЕНИЕ НА ФРАГМЕНТЫ
+# =====================================
+
+def split_text(text):
+
+    text=clean_text(
+        text
+    )
+
+    words=text.split()
+
+    parts=[]
+
+    chunk_size=40
+
+    for i in range(
+        0,
+        len(words),
+        chunk_size
+    ):
+
+        chunk=" ".join(
+
+            words[
+                i:i+chunk_size
+            ]
+
+        )
+
+        if len(
+            chunk
+        )>50:
+
+            parts.append(
+                chunk
+            )
+
+    return parts
+
+
+# =====================================
 # ПРОВЕРКА ОШИБОК
-# ==========================
+# =====================================
 
 def check_spelling(text):
 
     try:
 
         response=requests.post(
+
             API_URL,
+
             data={
                 "text":text,
                 "language":"ru"
             },
+
             timeout=15
         )
 
@@ -154,19 +208,28 @@ def check_spelling(text):
 
     errors=[]
 
+    seen=set()
+
     for m in data.get(
         "matches",
         []
     ):
 
+        word=text[
+            m["offset"]:
+            m["offset"]+
+            m["length"]
+        ]
+
+        if word in seen:
+            continue
+
+        seen.add(word)
+
         errors.append({
 
             "word":
-            text[
-                m["offset"]:
-                m["offset"]+
-                m["length"]
-            ],
+            word,
 
             "message":
             m["message"],
@@ -188,17 +251,29 @@ def check_spelling(text):
     return errors
 
 
-# ==========================
+# =====================================
 # ПЛАГИАТ
-# ==========================
+# =====================================
 
 def check_plagiarism(text):
 
-    input_text=clean_text(
+    input_parts=split_text(
         text
     )
 
-    docs=[]
+    if len(
+        input_parts
+    )==0:
+
+        return(
+            0,
+            "Нет текста"
+        )
+
+
+    best_score=0
+    best_source=""
+
 
     for file in os.listdir(
         DATABASE_FOLDER
@@ -211,92 +286,87 @@ def check_plagiarism(text):
 
         try:
 
-            content=extract_text(
+            db_text=extract_text(
                 path
             )
 
-            content=clean_text(
-                content
+            db_parts=split_text(
+                db_text
             )
 
-            if content:
+            if len(
+                db_parts
+            )==0:
 
-                docs.append(
-                    (
-                        file,
-                        content
-                    )
-                )
-
-        except:
-            pass
+                continue
 
 
-    if len(docs)==0:
+            all_texts=(
+                input_parts+
+                db_parts
+            )
 
-        return(
-            0,
-            "База пуста"
-        )
+            vectorizer=TfidfVectorizer()
+
+            matrix=vectorizer.fit_transform(
+                all_texts
+            )
+
+            input_matrix=matrix[
+                :len(input_parts)
+            ]
+
+            db_matrix=matrix[
+                len(input_parts):
+            ]
 
 
-    for file,content in docs:
-
-        if content==input_text:
-
-            return(
-                100,
-                file
+            similarity=cosine_similarity(
+                input_matrix,
+                db_matrix
             )
 
 
-    texts=[
-
-        x[1]
-
-        for x in docs
-
-    ]
-
-    texts.append(
-        input_text
-    )
+            matches=0
 
 
-    vectorizer=TfidfVectorizer()
+            for row in similarity:
 
-    matrix=vectorizer.fit_transform(
-        texts
-    )
+                if row.max()>0.7:
 
-
-    similarity=cosine_similarity(
-
-        matrix[-1],
-        matrix[:-1]
-
-    )
+                    matches+=1
 
 
-    score=float(
-        similarity.max()
-    )*100
+            score=round(
+
+                matches/
+                len(input_parts)
+                *100,
+
+                2
+            )
 
 
-    index=similarity.argmax()
+            if score>best_score:
 
-    source=docs[index][0]
+                best_score=score
+                best_source=file
+
+
+        except Exception as e:
+
+            print(e)
 
 
     return(
-        round(score,2),
-        source
+        best_score,
+        best_source
     )
 
 
-# ==========================
+# =====================================
 # ДОБАВИТЬ В БАЗУ
-# ==========================
+# =====================================
 
 @app.post("/add_to_database")
 async def add_to_database(
@@ -329,9 +399,9 @@ async def add_to_database(
     }
 
 
-# ==========================
+# =====================================
 # ПРОВЕРКА
-# ==========================
+# =====================================
 
 @app.post("/check")
 async def check(
@@ -367,7 +437,6 @@ async def check(
     plagiarism,source=check_plagiarism(
         text
     )
-
 
     return{
 
