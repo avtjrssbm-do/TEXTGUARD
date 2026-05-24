@@ -39,10 +39,6 @@ os.makedirs(
 )
 
 
-# ==========================
-# ЧТЕНИЕ ФАЙЛОВ
-# ==========================
-
 def load_txt(path):
 
     with open(
@@ -59,7 +55,7 @@ def load_docx(path):
 
     doc = Document(path)
 
-    text = []
+    text=[]
 
     for p in doc.paragraphs:
 
@@ -74,19 +70,19 @@ def load_docx(path):
 
 def load_pdf(path):
 
-    reader = PdfReader(path)
+    reader=PdfReader(path)
 
-    text = ""
+    text=""
 
     for page in reader.pages:
 
         try:
 
-            page_text = page.extract_text()
+            page_text=page.extract_text()
 
             if page_text:
 
-                text += page_text + "\n"
+                text+=page_text+"\n"
 
         except:
 
@@ -97,21 +93,21 @@ def load_pdf(path):
 
 def extract_text(path):
 
-    ext = os.path.splitext(
+    ext=os.path.splitext(
         path
     )[1].lower()
 
     try:
 
-        if ext == ".txt":
+        if ext==".txt":
 
             return load_txt(path)
 
-        elif ext == ".docx":
+        elif ext==".docx":
 
             return load_docx(path)
 
-        elif ext == ".pdf":
+        elif ext==".pdf":
 
             return load_pdf(path)
 
@@ -126,21 +122,17 @@ def extract_text(path):
     return ""
 
 
-# ==========================
-# ОЧИСТКА
-# ==========================
-
 def clean_text(text):
 
-    text = text.lower()
+    text=text.lower()
 
-    text = re.sub(
+    text=re.sub(
         r"\s+",
         " ",
         text
     )
 
-    text = re.sub(
+    text=re.sub(
         r"[^\w\s]",
         "",
         text
@@ -149,22 +141,18 @@ def clean_text(text):
     return text.strip()
 
 
-# ==========================
-# ПРОВЕРКА ОШИБОК
-# ==========================
-
 def check_spelling(text):
 
     try:
 
-        response = requests.post(
+        response=requests.post(
 
             API_URL,
 
             data={
 
-                "text": text,
-                "language": "ru"
+                "text":text,
+                "language":"ru"
 
             },
 
@@ -172,24 +160,24 @@ def check_spelling(text):
 
         )
 
-        data = response.json()
+        data=response.json()
 
     except:
 
         return []
 
-    errors = []
+    errors=[]
 
-    seen = set()
+    seen=set()
 
     for m in data.get(
         "matches",
         []
     ):
 
-        word = text[
+        word=text[
             m["offset"]:
-            m["offset"] +
+            m["offset"]+
             m["length"]
         ]
 
@@ -197,7 +185,9 @@ def check_spelling(text):
 
             continue
 
-        seen.add(word)
+        seen.add(
+            word
+        )
 
         errors.append({
 
@@ -218,14 +208,11 @@ def check_spelling(text):
                 )[:5]
 
             ]
+
         })
 
     return errors
 
-
-# ==========================
-# ПЛАГИАТ
-# ==========================
 
 def check_plagiarism(text):
 
@@ -235,9 +222,9 @@ def check_plagiarism(text):
         text
     )
 
-    print("\nБАЗА:")
+    print("\n===== БАЗА =====")
 
-    for root, dirs, files in os.walk(
+    for root,dirs,files in os.walk(
         DATABASE_FOLDER
     ):
 
@@ -270,7 +257,7 @@ def check_plagiarism(text):
                     content
                 )
 
-                if len(content)>20:
+                if len(content)>0:
 
                     docs.append(
                         (
@@ -292,6 +279,7 @@ def check_plagiarism(text):
                     e
                 )
 
+
     if not docs:
 
         return(
@@ -300,11 +288,11 @@ def check_plagiarism(text):
         )
 
 
-    # полное совпадение
+    # точное совпадение
 
     for filename,content in docs:
 
-        if input_text==content:
+        if content==input_text:
 
             return(
                 100,
@@ -327,9 +315,8 @@ def check_plagiarism(text):
 
     vectorizer=TfidfVectorizer(
 
-        ngram_range=(1,3),
-
-        max_features=50000
+        analyzer="char_wb",
+        ngram_range=(3,5)
 
     )
 
@@ -348,18 +335,13 @@ def check_plagiarism(text):
 
 
     score=float(
-
         similarity.max()
-
     )*100
 
 
     index=similarity.argmax()
 
-    source=docs[
-        index
-    ][0]
-
+    source=docs[index][0]
 
     return(
 
@@ -368,18 +350,13 @@ def check_plagiarism(text):
     )
 
 
-# ==========================
-# API
-# ==========================
-
 @app.get("/")
 def home():
 
-    return {
+    return{
 
         "status":
         "TextGuard API running"
-
     }
 
 
@@ -394,7 +371,6 @@ async def check(
 
         UPLOAD_FOLDER,
         file.filename
-
     )
 
     with open(
@@ -406,6 +382,7 @@ async def check(
             file.file,
             buffer
         )
+
 
     text=extract_text(
         filepath
@@ -419,7 +396,8 @@ async def check(
         text
     )
 
-    return {
+
+    return{
 
         "filename":
         file.filename,
