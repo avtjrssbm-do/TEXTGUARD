@@ -9,7 +9,6 @@ import requests
 import re
 import time
 
-from difflib import SequenceMatcher
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -40,9 +39,9 @@ os.makedirs(
 )
 
 
-# =====================
+# ======================
 # ЧТЕНИЕ ФАЙЛОВ
-# =====================
+# ======================
 
 def load_txt(path):
 
@@ -61,8 +60,13 @@ def load_docx(path):
     doc=Document(path)
 
     return "\n".join(
+
         p.text
+
         for p in doc.paragraphs
+
+        if p.text.strip()
+
     )
 
 
@@ -76,10 +80,7 @@ def load_pdf(path):
 
         try:
 
-            text+=(
-                page.extract_text()
-                or ""
-            )
+            text+=page.extract_text() or ""
 
         except:
             pass
@@ -115,19 +116,13 @@ def extract_text(path):
     return ""
 
 
-# =====================
-# ОЧИСТКА ТЕКСТА
-# =====================
+# ======================
+# ОЧИСТКА
+# ======================
 
 def clean_text(text):
 
     text=text.lower()
-
-    text=re.sub(
-        r"[^\w\s]",
-        " ",
-        text
-    )
 
     text=re.sub(
         r"\s+",
@@ -135,23 +130,32 @@ def clean_text(text):
         text
     )
 
+    text=re.sub(
+        r"[^\w\s]",
+        "",
+        text
+    )
+
     return text.strip()
 
 
-# =====================
-# ОШИБКИ
-# =====================
+# ======================
+# ПРОВЕРКА ОШИБОК
+# ======================
 
 def check_spelling(text):
 
     try:
 
         response=requests.post(
+
             API_URL,
+
             data={
                 "text":text,
                 "language":"ru"
             },
+
             timeout=15
         )
 
@@ -162,6 +166,7 @@ def check_spelling(text):
         return []
 
     errors=[]
+
     seen=set()
 
     for m in data.get(
@@ -176,6 +181,7 @@ def check_spelling(text):
         ]
 
         if word in seen:
+
             continue
 
         seen.add(word)
@@ -199,15 +205,14 @@ def check_spelling(text):
                 )[:5]
 
             ]
-
         })
 
     return errors
 
 
-# =====================
+# ======================
 # ПЛАГИАТ
-# =====================
+# ======================
 
 def check_plagiarism(text):
 
@@ -216,8 +221,6 @@ def check_plagiarism(text):
     input_text=clean_text(
         text
     )
-
-    print("\n====== БАЗА ======")
 
     for root,dirs,files in os.walk(
         DATABASE_FOLDER
@@ -230,38 +233,29 @@ def check_plagiarism(text):
                 filename
             )
 
-            ext=os.path.splitext(
-                filename
-            )[1].lower()
+            try:
 
-            if ext not in [
-                ".txt",
-                ".docx",
-                ".pdf"
-            ]:
+                content=extract_text(
+                    path
+                )
+
+                content=clean_text(
+                    content
+                )
+
+                if content:
+
+                    docs.append(
+                        (
+                            filename,
+                            content
+                        )
+                    )
+
+            except:
+
                 continue
 
-            content=extract_text(
-                path
-            )
-
-            content=clean_text(
-                content
-            )
-
-            if len(content)>10:
-
-                docs.append(
-                    (
-                        filename,
-                        content
-                    )
-                )
-
-                print(
-                    "✓",
-                    filename
-                )
 
     if not docs:
 
@@ -271,11 +265,11 @@ def check_plagiarism(text):
         )
 
 
-    # Полное совпадение
+    # ТОЧНОЕ совпадение
 
     for filename,content in docs:
 
-        if input_text==content:
+        if content==input_text:
 
             return(
                 100,
@@ -283,69 +277,63 @@ def check_plagiarism(text):
             )
 
 
-    # Почти полное совпадение
+    # TF-IDF сравнение
 
-    best_score=0
-    best_file=""
-
-    for filename,content in docs:
-
-        score=SequenceMatcher(
-            None,
-            input_text,
-            content
-        ).ratio()*100
-
-        if score>best_score:
-
-            best_score=score
-            best_file=filename
-
-
-    # TF-IDF дополнительная проверка
-
-    all_texts=[
+    texts=[
 
         x[1]
 
         for x in docs
 
+    ]+[
+
+        input_text
+
     ]
 
-    all_texts.append(
-        input_text
+
+    vectorizer=TfidfVectorizer(
+
+        ngram_range=(1,2)
+
     )
 
-    vectorizer=TfidfVectorizer()
 
-    tfidf=vectorizer.fit_transform(
-        all_texts
+    matrix=vectorizer.fit_transform(
+        texts
     )
 
-    sim=cosine_similarity(
-        tfidf[-1],
-        tfidf[:-1]
+
+    similarity=cosine_similarity(
+
+        matrix[-1],
+        matrix[:-1]
+
     )
 
-    tfidf_score=float(
-        sim.max()
+
+    score=float(
+        similarity.max()
     )*100
 
 
-    final_score=max(
-        best_score,
-        tfidf_score
-    )
+    index=similarity.argmax()
+
+    source=docs[
+        index
+    ][0]
+
 
     return(
-        round(final_score,2),
-        best_file
+
+        round(score,2),
+        source
     )
 
 
-# =====================
+# ======================
 # API
-# =====================
+# ======================
 
 @app.get("/")
 def home():
