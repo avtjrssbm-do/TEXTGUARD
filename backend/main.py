@@ -12,6 +12,7 @@ import time
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+
 app = FastAPI()
 
 app.add_middleware(
@@ -22,10 +23,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_FOLDER = "uploads"
-DATABASE_FOLDER = "documents_db"
+UPLOAD_FOLDER="uploads"
+DATABASE_FOLDER="documents_db"
 
-API_URL = "https://api.languagetool.org/v2/check"
+API_URL="https://api.languagetool.org/v2/check"
 
 os.makedirs(
     UPLOAD_FOLDER,
@@ -43,7 +44,8 @@ def load_txt(path):
     with open(
         path,
         "r",
-        encoding="utf-8"
+        encoding="utf-8",
+        errors="ignore"
     ) as f:
 
         return f.read()
@@ -51,40 +53,55 @@ def load_txt(path):
 
 def load_docx(path):
 
-    doc = Document(path)
+    doc=Document(path)
 
     return "\n".join(
+
         p.text
+
         for p in doc.paragraphs
+
     )
 
 
 def load_pdf(path):
 
-    reader = PdfReader(path)
+    reader=PdfReader(path)
 
-    text = ""
+    text=""
 
     for page in reader.pages:
 
-        text += (
-            page.extract_text()
-            or ""
-        )
+        text+=page.extract_text() or ""
 
     return text
 
 
 def extract_text(path):
 
-    if path.endswith(".txt"):
-        return load_txt(path)
+    ext=os.path.splitext(path)[1].lower()
 
-    elif path.endswith(".docx"):
-        return load_docx(path)
+    try:
 
-    elif path.endswith(".pdf"):
-        return load_pdf(path)
+        if ext==".txt":
+
+            return load_txt(path)
+
+        elif ext==".docx":
+
+            return load_docx(path)
+
+        elif ext==".pdf":
+
+            return load_pdf(path)
+
+    except Exception as e:
+
+        print(
+            "Ошибка чтения:",
+            path,
+            e
+        )
 
     return ""
 
@@ -93,33 +110,38 @@ def check_spelling(text):
 
     try:
 
-        response = requests.post(
+        response=requests.post(
+
             API_URL,
+
             data={
-                "text": text,
-                "language": "ru"
+
+                "text":text,
+                "language":"ru"
+
             },
+
             timeout=15
+
         )
 
-        data = response.json()
+        data=response.json()
 
-    except Exception:
+    except:
 
         return []
 
-    errors = []
-
-    seen = set()
+    errors=[]
+    seen=set()
 
     for m in data.get(
         "matches",
         []
     ):
 
-        word = text[
+        word=text[
             m["offset"]:
-            m["offset"] +
+            m["offset"]+
             m["length"]
         ]
 
@@ -136,8 +158,7 @@ def check_spelling(text):
             "message":
             m["message"],
 
-            "replacements":
-            [
+            "replacements":[
 
                 x["value"]
 
@@ -148,6 +169,7 @@ def check_spelling(text):
                 )[:5]
 
             ]
+
         })
 
     return errors
@@ -155,15 +177,15 @@ def check_spelling(text):
 
 def clean_text(text):
 
-    text = text.lower()
+    text=text.lower()
 
-    text = re.sub(
+    text=re.sub(
         r"\s+",
         " ",
         text
     )
 
-    text = re.sub(
+    text=re.sub(
         r"[^\w\s]",
         "",
         text
@@ -174,89 +196,125 @@ def clean_text(text):
 
 def check_plagiarism(text):
 
-    docs = []
+    docs=[]
+
+    input_text=clean_text(text)
 
     for filename in os.listdir(
         DATABASE_FOLDER
     ):
 
-        path = os.path.join(
+        path=os.path.join(
             DATABASE_FOLDER,
             filename
         )
 
         try:
 
-            content = extract_text(
+            content=extract_text(
                 path
             )
 
-            docs.append(
-                (
-                    filename,
-                    content
-                )
+            content=clean_text(
+                content
             )
 
-        except:
+            if content:
+
+                docs.append(
+                    (
+                        filename,
+                        content
+                    )
+                )
+
+        except Exception as e:
+
+            print(
+                "Ошибка:",
+                filename,
+                e
+            )
+
             continue
+
 
     if not docs:
 
-        return (
+        return(
             0,
             "База пуста"
         )
 
-    cleaned_docs = [
 
-        clean_text(
-            d[1]
-        )
+    # проверка на почти полное совпадение
+
+    for filename,content in docs:
+
+        if input_text==content:
+
+            return(
+                100,
+                filename
+            )
+
+
+    all_texts=[
+
+        d[1]
 
         for d in docs
-    ]
 
-    input_text = clean_text(
-        text
-    )
+    ]+[
 
-    all_texts = cleaned_docs + [
         input_text
+
     ]
 
-    vectorizer = TfidfVectorizer(
-        ngram_range=(2,3),
-        max_features=10000
+
+    vectorizer=TfidfVectorizer(
+
+        ngram_range=(1,3),
+        max_features=30000
+
     )
 
-    tfidf = vectorizer.fit_transform(
+
+    tfidf=vectorizer.fit_transform(
         all_texts
     )
 
-    similarity = cosine_similarity(
+
+    similarity=cosine_similarity(
+
         tfidf[-1],
         tfidf[:-1]
+
     )
 
-    score = float(
+
+    score=float(
         similarity.max()
-    ) * 100
+    )*100
 
-    index = similarity.argmax()
 
-    source = docs[index][0]
+    index=similarity.argmax()
 
-    return (
+    source=docs[index][0]
+
+
+    return(
+
         round(score,2),
         source
+
     )
 
 
 @app.get("/")
 def home():
 
-    return {
+    return{
 
         "status":
         "TextGuard API running"
@@ -266,14 +324,16 @@ def home():
 
 @app.post("/check")
 async def check(
-        file: UploadFile = File(...)
+    file:UploadFile=File(...)
 ):
 
-    start = time.time()
+    start=time.time()
 
-    filepath = os.path.join(
+    filepath=os.path.join(
+
         UPLOAD_FOLDER,
         file.filename
+
     )
 
     with open(
@@ -286,19 +346,20 @@ async def check(
             buffer
         )
 
-    text = extract_text(
+
+    text=extract_text(
         filepath
     )
 
-    errors = check_spelling(
+    errors=check_spelling(
         text
     )
 
-    plagiarism, source = check_plagiarism(
+    plagiarism,source=check_plagiarism(
         text
     )
 
-    return {
+    return{
 
         "filename":
         file.filename,
@@ -311,7 +372,7 @@ async def check(
 
         "uniqueness":
         round(
-            100 - plagiarism,
+            100-plagiarism,
             2
         ),
 

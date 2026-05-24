@@ -7,110 +7,300 @@
 
 <style>
 
-body{
+*{
 margin:0;
-padding:20px;
-font-family:Arial;
-background:linear-gradient(135deg,#0B3D91,#1E90FF);
-color:white;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}
+
+body{
+background:#f2f5fb;
+padding:15px;
 }
 
 .container{
-max-width:700px;
+max-width:500px;
 margin:auto;
+}
+
+.header{
+display:flex;
+align-items:center;
+gap:10px;
+margin-bottom:20px;
+}
+
+
+.title{
+font-size:26px;
+font-weight:bold;
+color:#111;
 }
 
 .card{
 background:white;
-color:black;
-padding:15px;
-margin-top:20px;
-border-radius:15px;
+border-radius:25px;
+padding:20px;
+margin-bottom:15px;
+box-shadow:0 4px 15px rgba(0,0,0,.08);
 }
 
-button,input{
-width:100%;
-padding:12px;
-margin-top:10px;
-border:none;
-border-radius:10px;
+.uploadCard{
+text-align:center;
+}
+
+.uploadArea{
+
+border:2px dashed #d8e2ff;
+border-radius:25px;
+padding:30px;
+background:#fafcff;
+margin-bottom:20px;
+transition:.3s;
+
+}
+
+.uploadArea:hover{
+
+border-color:#2962ff;
+
+}
+
+.uploadIcon{
+
+font-size:60px;
+color:#2962ff;
+margin-bottom:15px;
+
+}
+
+.uploadArea h3{
+
+margin-bottom:10px;
+color:#222;
+
+}
+
+.uploadArea p{
+
+color:#777;
+margin:5px 0;
+
+}
+
+.formats{
+
+font-size:13px;
+color:#999;
+
+}
+
+.chooseBtn{
+
+background:#2962ff;
+width:220px;
+margin:auto;
+margin-top:15px;
+
+}
+
+.checkBtn{
+
+background:#00C853;
+margin-top:15px;
+
 }
 
 button{
-background:#00C853;
+
+padding:14px;
+border:none;
+border-radius:12px;
 color:white;
 font-size:16px;
-}
-
-.progress{
-display:none;
-height:20px;
-background:#ddd;
-border-radius:20px;
-overflow:hidden;
-margin-top:10px;
-}
-
-.bar{
-height:100%;
-width:0%;
-background:#00C853;
+font-weight:bold;
+cursor:pointer;
+width:100%;
 transition:.3s;
+
+}
+
+button:active{
+
+transform:scale(.98);
+
+}
+
+.stats{
+
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+
+}
+
+.stat{
+
+padding:15px;
+border-radius:15px;
+background:white;
+border:1px solid #eee;
+
+}
+
+.big{
+
+font-size:28px;
+font-weight:bold;
+margin-bottom:5px;
+
+}
+
+.green{
+color:#00C853;
+}
+
+.red{
+color:#ff4444;
+}
+
+.orange{
+color:#ff9800;
+}
+
+.blue{
+color:#2962ff;
 }
 
 .textBox{
+
 height:350px;
 overflow-y:auto;
-border:1px solid #ddd;
+line-height:1.8;
 padding:15px;
-border-radius:10px;
-background:#f7f7f7;
-white-space:pre-wrap;
-line-height:1.7;
+background:#fafafa;
+border-radius:15px;
+border:1px solid #ddd;
 scroll-behavior:smooth;
+
 }
 
 .highlight{
-background:#ffeb3b;
+
+background:#ffe84f;
 padding:2px;
 border-radius:4px;
+transition:.5s;
+
 }
 
 .error{
+
+padding:15px;
 margin-top:10px;
-padding:10px;
-background:#fff0f0;
-border-left:4px solid red;
+background:#fff5f5;
+border-radius:12px;
 cursor:pointer;
-border-radius:10px;
+border-left:5px solid red;
+transition:.3s;
+
 }
 
 .error:hover{
-background:#ffd9d9;
+
+transform:scale(1.02);
+
+}
+
+.progress{
+
+display:none;
+margin-top:10px;
+height:10px;
+background:#ddd;
+border-radius:20px;
+overflow:hidden;
+
+}
+
+.bar{
+
+width:0%;
+height:100%;
+background:#135DFF;
+transition:.3s;
+
 }
 
 </style>
+
 </head>
 
 <body>
 
 <div class="container">
 
-<h1>📘 TextGuard</h1>
+<div class="header">
 
-<div class="card">
+<div class="title">
+TextGuard
+</div>
 
-<input type="file" id="file">
+</div>
 
-<button onclick="checkFile()">
-Проверить
+
+<div class="card uploadCard">
+
+<div class="uploadArea">
+
+<div class="uploadIcon">
+☁
+</div>
+
+<h3>
+Перетащите файл сюда
+</h3>
+
+<p>
+или выберите файл для загрузки
+</p>
+
+<p class="formats">
+Поддерживаются: .txt .docx .pdf
+</p>
+
+<input
+type="file"
+id="file"
+hidden
+>
+
+<button
+class="chooseBtn"
+onclick="document.getElementById('file').click()"
+>
+Выбрать файл
+</button>
+
+</div>
+
+
+<button
+class="checkBtn"
+onclick="checkFile()"
+>
+Проверить текст
 </button>
 
 <div class="progress" id="progress">
+
 <div class="bar" id="bar"></div>
+
 </div>
 
 </div>
+
 
 <div id="result"></div>
 
@@ -120,7 +310,10 @@ background:#ffd9d9;
 
 async function checkFile(){
 
-const file=document.getElementById("file").files[0];
+const file=
+document.getElementById(
+"file"
+).files[0];
 
 if(!file){
 
@@ -130,22 +323,29 @@ return;
 }
 
 const progress=
-document.getElementById("progress");
+document.getElementById(
+"progress"
+);
 
 const bar=
-document.getElementById("bar");
+document.getElementById(
+"bar"
+);
 
-progress.style.display="block";
+progress.style.display=
+"block";
 
-let value=0;
+let val=0;
 
 let fake=
 setInterval(()=>{
 
-if(value<90){
+if(val<90){
 
-value+=10;
-bar.style.width=value+"%";
+val+=10;
+
+bar.style.width=
+val+"%";
 
 }
 
@@ -177,12 +377,11 @@ clearInterval(fake);
 
 bar.style.width="100%";
 
-let text=
-data.text;
+let text=data.text;
 
 data.errors.forEach((e,i)=>{
 
-let safeWord=
+let safe=
 e.word.replace(
 /[.*+?^${}()|[\]\\]/g,
 '\\$&'
@@ -190,54 +389,52 @@ e.word.replace(
 
 text=
 text.replace(
+
 new RegExp(
-safeWord,
+safe,
 "i"
 ),
 
-`<span
-class="highlight"
-id="err${i}"
->
-${e.word}
-</span>`
+`<span class="highlight" id="err${i}">${e.word}</span>`
 
 );
 
 });
 
+
 let html=`
 
-<div class="card">
+<div class="stats">
 
-<h3>${data.filename}</h3>
+<div class="stat">
+<div class="big green">${data.uniqueness}%</div>
+Уникальность
+</div>
 
-<p>
-📊 Плагиат:
-<b>${data.plagiarism}%</b>
-</p>
+<div class="stat">
+<div class="big red">${data.plagiarism}%</div>
+Плагиат
+</div>
 
-<p>
-❗ Ошибок:
-${data.errors_count}
-</p>
+<div class="stat">
+<div class="big orange">${data.errors_count}</div>
+Ошибки
+</div>
 
-<p>
-⏱ ${data.time} сек
-</p>
+<div class="stat">
+<div class="big blue">${data.time}</div>
+сек
+</div>
 
 </div>
 
 <div class="card">
 
-<h3>
-Текст документа
-</h3>
+<h3>Текст документа</h3>
 
-<div
-class="textBox"
-id="textBox"
->
+<br>
+
+<div class="textBox" id="textBox">
 
 ${text}
 
@@ -249,10 +446,7 @@ ${text}
 
 if(data.errors.length){
 
-html+=`
-<div class="card">
-<h3>Ошибки</h3>
-`;
+html+=`<div class="card"><h3>Ошибки</h3>`;
 
 data.errors.forEach((e,i)=>{
 
@@ -265,7 +459,7 @@ onclick="jumpToError(${i})"
 
 <b>${e.word}</b>
 
-<br>
+<br><br>
 
 ${e.message}
 
@@ -279,59 +473,73 @@ ${e.replacements.join(", ")}
 
 });
 
-html+="</div>";
+html+=`</div>`;
 
 }
 
 document.getElementById(
 "result"
-).innerHTML=html;
+).innerHTML=
+html;
 
 setTimeout(()=>{
 
-progress.style.display="none";
-bar.style.width="0%";
+progress.style.display=
+"none";
+
+bar.style.width=
+"0%";
 
 },1000);
 
 }
+
 catch{
 
-alert(
-"Ошибка подключения"
-);
+alert("Ошибка подключения");
 
 }
 
 }
+
 
 function jumpToError(index){
 
-const target=
+const element=
 document.getElementById(
 "err"+index
 );
 
-const box=
-document.getElementById(
-"textBox"
-);
+if(!element)return;
 
-if(!target||!box)return;
+element.scrollIntoView({
 
-box.scrollTop=
-target.offsetTop-
-150;
+behavior:"smooth",
+block:"center"
 
-target.style.background=
+});
+
+element.style.background=
 "#ff9800";
+
+element.style.transform=
+"scale(1.25)";
+
+element.style.boxShadow=
+"0 0 15px orange";
 
 setTimeout(()=>{
 
-target.style.background=
-"#ffeb3b";
+element.style.background=
+"#ffe84f";
 
-},1000);
+element.style.transform=
+"scale(1)";
+
+element.style.boxShadow=
+"none";
+
+},1500);
 
 }
 
