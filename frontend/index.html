@@ -378,7 +378,7 @@ try{
 
 const response=
 await fetch(
-"https://textguard-ychm.onrender.com/check",
+"http://127.0.0.1:8000/check",
 {
 method:"POST",
 body:formData
@@ -511,7 +511,7 @@ bar.style.width=
 catch{
 
 alert(
-"Ошибка подключения"
+"Ошибка подключения к FastAPI"
 );
 
 }
