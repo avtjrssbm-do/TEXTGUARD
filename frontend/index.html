@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+
 <title>TextGuard</title>
 
 <style>
@@ -27,10 +30,8 @@ margin:auto;
 .header{
 display:flex;
 align-items:center;
-gap:10px;
 margin-bottom:20px;
 }
-
 
 .title{
 font-size:26px;
@@ -51,69 +52,52 @@ text-align:center;
 }
 
 .uploadArea{
-
 border:2px dashed #d8e2ff;
 border-radius:25px;
 padding:30px;
 background:#fafcff;
 margin-bottom:20px;
 transition:.3s;
-
 }
 
 .uploadArea:hover{
-
 border-color:#2962ff;
-
 }
 
 .uploadIcon{
-
 font-size:60px;
 color:#2962ff;
 margin-bottom:15px;
-
 }
 
 .uploadArea h3{
-
 margin-bottom:10px;
 color:#222;
-
 }
 
 .uploadArea p{
-
 color:#777;
 margin:5px 0;
-
 }
 
 .formats{
-
 font-size:13px;
 color:#999;
-
 }
 
 .chooseBtn{
-
 background:#2962ff;
 width:220px;
 margin:auto;
 margin-top:15px;
-
 }
 
 .checkBtn{
-
 background:#00C853;
 margin-top:15px;
-
 }
 
 button{
-
 padding:14px;
 border:none;
 border-radius:12px;
@@ -123,38 +107,40 @@ font-weight:bold;
 cursor:pointer;
 width:100%;
 transition:.3s;
-
 }
 
 button:active{
-
 transform:scale(.98);
+}
 
+.fileName{
+margin-top:15px;
+padding:12px;
+background:#f5f7ff;
+border-radius:12px;
+font-size:14px;
+font-weight:bold;
+color:#555;
+border:1px solid #dce6ff;
 }
 
 .stats{
-
 display:grid;
 grid-template-columns:1fr 1fr;
 gap:10px;
-
 }
 
 .stat{
-
 padding:15px;
 border-radius:15px;
 background:white;
 border:1px solid #eee;
-
 }
 
 .big{
-
 font-size:28px;
 font-weight:bold;
 margin-bottom:5px;
-
 }
 
 .green{
@@ -174,7 +160,6 @@ color:#2962ff;
 }
 
 .textBox{
-
 height:350px;
 overflow-y:auto;
 line-height:1.8;
@@ -183,20 +168,16 @@ background:#fafafa;
 border-radius:15px;
 border:1px solid #ddd;
 scroll-behavior:smooth;
-
 }
 
 .highlight{
-
 background:#ffe84f;
 padding:2px;
 border-radius:4px;
 transition:.5s;
-
 }
 
 .error{
-
 padding:15px;
 margin-top:10px;
 background:#fff5f5;
@@ -204,33 +185,26 @@ border-radius:12px;
 cursor:pointer;
 border-left:5px solid red;
 transition:.3s;
-
 }
 
 .error:hover{
-
 transform:scale(1.02);
-
 }
 
 .progress{
-
 display:none;
 margin-top:10px;
 height:10px;
 background:#ddd;
 border-radius:20px;
 overflow:hidden;
-
 }
 
 .bar{
-
 width:0%;
 height:100%;
-background:#135DFF;
+background:#2962ff;
 transition:.3s;
-
 }
 
 </style>
@@ -249,7 +223,6 @@ TextGuard
 
 </div>
 
-
 <div class="card uploadCard">
 
 <div class="uploadArea">
@@ -263,7 +236,7 @@ TextGuard
 </h3>
 
 <p>
-или выберите файл для загрузки
+или выберите файл
 </p>
 
 <p class="formats">
@@ -274,6 +247,7 @@ TextGuard
 type="file"
 id="file"
 hidden
+onchange="showFileName()"
 >
 
 <button
@@ -283,8 +257,14 @@ onclick="document.getElementById('file').click()"
 Выбрать файл
 </button>
 
+<div
+class="fileName"
+id="selectedFile"
+>
+Файл не выбран
 </div>
 
+</div>
 
 <button
 class="checkBtn"
@@ -293,20 +273,52 @@ onclick="checkFile()"
 Проверить текст
 </button>
 
-<div class="progress" id="progress">
+<div
+class="progress"
+id="progress"
+>
 
-<div class="bar" id="bar"></div>
+<div
+class="bar"
+id="bar"
+></div>
 
 </div>
 
 </div>
-
 
 <div id="result"></div>
 
 </div>
 
 <script>
+
+function showFileName(){
+
+const file=
+document.getElementById(
+"file"
+).files[0];
+
+const label=
+document.getElementById(
+"selectedFile"
+);
+
+if(file){
+
+label.innerHTML=
+file.name;
+
+}else{
+
+label.innerHTML=
+"Файл не выбран";
+
+}
+
+}
+
 
 async function checkFile(){
 
@@ -317,7 +329,10 @@ document.getElementById(
 
 if(!file){
 
-alert("Выберите файл");
+alert(
+"Выберите файл"
+);
+
 return;
 
 }
@@ -381,14 +396,12 @@ let text=data.text;
 
 data.errors.forEach((e,i)=>{
 
-let safe=
-e.word.replace(
+let safe=e.word.replace(
 /[.*+?^${}()|[\]\\]/g,
 '\\$&'
 );
 
-text=
-text.replace(
+text=text.replace(
 
 new RegExp(
 safe,
@@ -400,7 +413,6 @@ safe,
 );
 
 });
-
 
 let html=`
 
@@ -434,7 +446,7 @@ let html=`
 
 <br>
 
-<div class="textBox" id="textBox">
+<div class="textBox">
 
 ${text}
 
@@ -446,7 +458,9 @@ ${text}
 
 if(data.errors.length){
 
-html+=`<div class="card"><h3>Ошибки</h3>`;
+html+=`<div class="card">
+
+<h3>Ошибки</h3>`;
 
 data.errors.forEach((e,i)=>{
 
@@ -496,7 +510,9 @@ bar.style.width=
 
 catch{
 
-alert("Ошибка подключения");
+alert(
+"Ошибка подключения"
+);
 
 }
 
@@ -510,7 +526,8 @@ document.getElementById(
 "err"+index
 );
 
-if(!element)return;
+if(!element)
+return;
 
 element.scrollIntoView({
 
@@ -522,22 +539,10 @@ block:"center"
 element.style.background=
 "#ff9800";
 
-element.style.transform=
-"scale(1.25)";
-
-element.style.boxShadow=
-"0 0 15px orange";
-
 setTimeout(()=>{
 
 element.style.background=
 "#ffe84f";
-
-element.style.transform=
-"scale(1)";
-
-element.style.boxShadow=
-"none";
 
 },1500);
 
@@ -546,4 +551,5 @@ element.style.boxShadow=
 </script>
 
 </body>
+
 </html>
