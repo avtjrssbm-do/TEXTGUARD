@@ -9,7 +9,9 @@ import requests
 import re
 import time
 
-from difflib import SequenceMatcher
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
 
 app=FastAPI()
 
@@ -37,9 +39,9 @@ os.makedirs(
 )
 
 
-# ====================
+# ==========================
 # ЧТЕНИЕ ФАЙЛОВ
-# ====================
+# ==========================
 
 def load_txt(path):
 
@@ -78,11 +80,7 @@ def load_pdf(path):
 
         try:
 
-            page_text=page.extract_text()
-
-            if page_text:
-
-                text+=page_text+"\n"
+            text+=page.extract_text() or ""
 
         except:
             pass
@@ -96,30 +94,21 @@ def extract_text(path):
         path
     )[1].lower()
 
-    try:
+    if ext==".txt":
+        return load_txt(path)
 
-        if ext==".txt":
-            return load_txt(path)
+    elif ext==".docx":
+        return load_docx(path)
 
-        elif ext==".docx":
-            return load_docx(path)
-
-        elif ext==".pdf":
-            return load_pdf(path)
-
-    except Exception as e:
-
-        print(
-            "Ошибка:",
-            e
-        )
+    elif ext==".pdf":
+        return load_pdf(path)
 
     return ""
 
 
-# ====================
+# ==========================
 # ОЧИСТКА
-# ====================
+# ==========================
 
 def clean_text(text):
 
@@ -140,23 +129,20 @@ def clean_text(text):
     return text.strip()
 
 
-# ====================
-# ОШИБКИ
-# ====================
+# ==========================
+# ПРОВЕРКА ОШИБОК
+# ==========================
 
 def check_spelling(text):
 
     try:
 
         response=requests.post(
-
             API_URL,
-
             data={
                 "text":text,
                 "language":"ru"
             },
-
             timeout=15
         )
 
@@ -168,28 +154,19 @@ def check_spelling(text):
 
     errors=[]
 
-    seen=set()
-
     for m in data.get(
         "matches",
         []
     ):
 
-        word=text[
-            m["offset"]:
-            m["offset"]+
-            m["length"]
-        ]
-
-        if word in seen:
-            continue
-
-        seen.add(word)
-
         errors.append({
 
             "word":
-            word,
+            text[
+                m["offset"]:
+                m["offset"]+
+                m["length"]
+            ],
 
             "message":
             m["message"],
@@ -211,27 +188,28 @@ def check_spelling(text):
     return errors
 
 
-# ====================
+# ==========================
 # ПЛАГИАТ
-# ====================
+# ==========================
 
 def check_plagiarism(text):
 
-    input_text=clean_text(text)
+    input_text=clean_text(
+        text
+    )
 
-    max_score=0
-    source=""
+    docs=[]
 
-    for root,dirs,files in os.walk(
+    for file in os.listdir(
         DATABASE_FOLDER
     ):
 
-        for filename in files:
+        path=os.path.join(
+            DATABASE_FOLDER,
+            file
+        )
 
-            path=os.path.join(
-                root,
-                filename
-            )
+        try:
 
             content=extract_text(
                 path
@@ -241,46 +219,84 @@ def check_plagiarism(text):
                 content
             )
 
-            if not content:
-                continue
+            if content:
 
-
-            if content==input_text:
-
-                return(
-                    100,
-                    filename
+                docs.append(
+                    (
+                        file,
+                        content
+                    )
                 )
 
+        except:
+            pass
 
-            similarity=SequenceMatcher(
 
-                None,
-                input_text,
-                content
+    if len(docs)==0:
 
-            ).ratio()
+        return(
+            0,
+            "База пуста"
+        )
 
-            score=round(
-                similarity*100,
-                2
+
+    for file,content in docs:
+
+        if content==input_text:
+
+            return(
+                100,
+                file
             )
 
-            if score>max_score:
 
-                max_score=score
-                source=filename
+    texts=[
+
+        x[1]
+
+        for x in docs
+
+    ]
+
+    texts.append(
+        input_text
+    )
+
+
+    vectorizer=TfidfVectorizer()
+
+    matrix=vectorizer.fit_transform(
+        texts
+    )
+
+
+    similarity=cosine_similarity(
+
+        matrix[-1],
+        matrix[:-1]
+
+    )
+
+
+    score=float(
+        similarity.max()
+    )*100
+
+
+    index=similarity.argmax()
+
+    source=docs[index][0]
 
 
     return(
-        max_score,
+        round(score,2),
         source
     )
 
 
-# ====================
-# ДОБАВЛЕНИЕ В БАЗУ
-# ====================
+# ==========================
+# ДОБАВИТЬ В БАЗУ
+# ==========================
 
 @app.post("/add_to_database")
 async def add_to_database(
@@ -304,15 +320,18 @@ async def add_to_database(
 
     return{
 
-        "status":"ok",
-        "filename":file.filename
+        "message":
+        "Файл добавлен",
+
+        "filename":
+        file.filename
 
     }
 
 
-# ====================
+# ==========================
 # ПРОВЕРКА
-# ====================
+# ==========================
 
 @app.post("/check")
 async def check(
@@ -336,6 +355,7 @@ async def check(
             buffer
         )
 
+
     text=extract_text(
         filepath
     )
@@ -347,6 +367,7 @@ async def check(
     plagiarism,source=check_plagiarism(
         text
     )
+
 
     return{
 
