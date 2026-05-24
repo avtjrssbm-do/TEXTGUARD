@@ -1,7 +1,13 @@
+# main.py
+
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+
 from docx import Document
 from PyPDF2 import PdfReader
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 import os
 import shutil
@@ -9,8 +15,10 @@ import requests
 import re
 import time
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+
+# ======================================================
+# FASTAPI
+# ======================================================
 
 app = FastAPI()
 
@@ -22,103 +30,177 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ======================================================
+# FOLDERS
+# ======================================================
+
 UPLOAD_FOLDER = "uploads"
 DATABASE_FOLDER = "documents_db"
+
 API_URL = "https://api.languagetool.org/v2/check"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(DATABASE_FOLDER, exist_ok=True)
 
 
-# =========================
-# ЧТЕНИЕ ФАЙЛОВ
-# =========================
+# ======================================================
+# FILE READERS
+# ======================================================
 
 def load_txt(path):
-    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+
+    with open(
+        path,
+        "r",
+        encoding="utf-8",
+        errors="ignore"
+    ) as f:
+
         return f.read()
 
 
 def load_docx(path):
+
     doc = Document(path)
-    return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+
+    return "\n".join(
+        p.text
+        for p in doc.paragraphs
+        if p.text.strip()
+    )
 
 
 def load_pdf(path):
+
     reader = PdfReader(path)
+
     text = ""
+
     for page in reader.pages:
+
         try:
-            text += page.extract_text() or ""
+
+            page_text = page.extract_text()
+
+            if page_text:
+                text += page_text + "\n"
+
         except:
             pass
+
     return text
 
 
 def extract_text(path):
+
     ext = os.path.splitext(path)[1].lower()
 
-    if ext == ".txt":
-        return load_txt(path)
-    elif ext == ".docx":
-        return load_docx(path)
-    elif ext == ".pdf":
-        return load_pdf(path)
+    try:
+
+        if ext == ".txt":
+            return load_txt(path)
+
+        elif ext == ".docx":
+            return load_docx(path)
+
+        elif ext == ".pdf":
+            return load_pdf(path)
+
+    except Exception as e:
+        print(e)
 
     return ""
 
 
-# =========================
-# ОЧИСТКА
-# =========================
+# ======================================================
+# CLEAN TEXT
+# ======================================================
 
 def clean_text(text):
+
     text = text.lower()
-    text = re.sub(r"[^\w\s]", " ", text)
-    text = re.sub(r"\s+", " ", text)
+
+    text = re.sub(
+        r"[^\w\s]",
+        " ",
+        text
+    )
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
+
     return text.strip()
 
 
-# =========================
-# ПОДГОТОВКА ТЕКСТА (ВАЖНО)
-# =========================
+# ======================================================
+# SPLIT TEXT
+# ======================================================
 
 def split_text(text):
+
     text = clean_text(text)
+
     words = text.split()
 
-    chunks = []
-    step = 40
+    parts = []
 
-    for i in range(0, len(words), step):
-        chunk = " ".join(words[i:i+step])
-        if len(chunk) > 30:
-            chunks.append(chunk)
+    chunk_size = 40
 
-    return chunks
+    for i in range(
+        0,
+        len(words),
+        chunk_size
+    ):
+
+        chunk = " ".join(
+            words[i:i + chunk_size]
+        )
+
+        if len(chunk) > 50:
+            parts.append(chunk)
+
+    return parts
 
 
-# =========================
-# ОШИБКИ (LanguageTool)
-# =========================
+# ======================================================
+# SPELLING CHECK
+# ======================================================
 
 def check_spelling(text):
+
     try:
+
         response = requests.post(
+
             API_URL,
-            data={"text": text, "language": "ru"},
+
+            data={
+                "text": text,
+                "language": "ru"
+            },
+
             timeout=15
         )
+
         data = response.json()
+
     except:
         return []
 
     errors = []
+
     seen = set()
 
     for m in data.get("matches", []):
 
-        word = text[m["offset"]: m["offset"] + m["length"]]
+        word = text[
+            m["offset"]:
+            m["offset"] + m["length"]
+        ]
 
         if word in seen:
             continue
@@ -126,116 +208,177 @@ def check_spelling(text):
         seen.add(word)
 
         errors.append({
-            "word": word,
-            "message": m["message"],
+
+            "word":
+            word,
+
+            "message":
+            m["message"],
+
             "replacements": [
-                r["value"] for r in m.get("replacements", [])[:5]
+
+                x["value"]
+
+                for x in
+                m.get(
+                    "replacements",
+                    []
+                )[:5]
+
             ]
+
         })
 
     return errors
 
 
-# =========================
-# ПЛАГИАТ (ИСПРАВЛЕННЫЙ ЯДЕРНЫЙ МЕХАНИЗМ)
-# =========================
-
-def load_database():
-    docs = []
-
-    for file in os.listdir(DATABASE_FOLDER):
-        path = os.path.join(DATABASE_FOLDER, file)
-
-        try:
-            text = extract_text(path)
-            text = clean_text(text)
-
-            if text:
-                docs.append((file, text))
-
-        except:
-            pass
-
-    return docs
-
+# ======================================================
+# PLAGIARISM
+# ======================================================
 
 def check_plagiarism(text):
+
     input_parts = split_text(text)
 
-    if not input_parts:
-        return 0, "Нет текста"
+    if len(input_parts) == 0:
 
-    docs = load_database()
-
-    if not docs:
-        return 0, "База пуста"
+        return (
+            0,
+            "Нет текста"
+        )
 
     best_score = 0
-    best_file = ""
+    best_source = ""
 
-    for filename, db_text in docs:
+    for file in os.listdir(DATABASE_FOLDER):
 
-        db_parts = split_text(db_text)
+        path = os.path.join(
+            DATABASE_FOLDER,
+            file
+        )
 
-        if not db_parts:
-            continue
+        try:
 
-        all_text = input_parts + db_parts
+            db_text = extract_text(path)
 
-        vectorizer = TfidfVectorizer()
-        matrix = vectorizer.fit_transform(all_text)
+            db_parts = split_text(db_text)
 
-        input_vec = matrix[:len(input_parts)]
-        db_vec = matrix[len(input_parts):]
+            if len(db_parts) == 0:
+                continue
 
-        similarity = cosine_similarity(input_vec, db_vec)
+            all_texts = (
+                input_parts +
+                db_parts
+            )
 
-        matches = 0
+            vectorizer = TfidfVectorizer()
 
-        for row in similarity:
-            if row.max() > 0.7:
-                matches += 1
+            matrix = vectorizer.fit_transform(
+                all_texts
+            )
 
-        score = (matches / len(input_parts)) * 100
+            input_matrix = matrix[
+                :len(input_parts)
+            ]
 
-        if score > best_score:
-            best_score = score
-            best_file = filename
+            db_matrix = matrix[
+                len(input_parts):
+            ]
 
-    return round(best_score, 2), best_file
+            similarity = cosine_similarity(
+                input_matrix,
+                db_matrix
+            )
+
+            matches = 0
+
+            for row in similarity:
+
+                if row.max() > 0.7:
+                    matches += 1
+
+            score = round(
+                matches /
+                len(input_parts)
+                * 100,
+                2
+            )
+
+            if score > best_score:
+
+                best_score = score
+                best_source = file
+
+        except Exception as e:
+
+            print(e)
+
+    return (
+        best_score,
+        best_source
+    )
 
 
-# =========================
-# ДОБАВЛЕНИЕ В БАЗУ (ВАЖНО)
-# =========================
+# ======================================================
+# ADD FILE TO DATABASE
+# ======================================================
 
 @app.post("/add_to_database")
-async def add_to_database(file: UploadFile = File(...)):
+async def add_to_database(
+    file: UploadFile = File(...)
+):
 
-    filepath = os.path.join(DATABASE_FOLDER, file.filename)
+    filepath = os.path.join(
+        DATABASE_FOLDER,
+        file.filename
+    )
 
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    with open(
+        filepath,
+        "wb"
+    ) as buffer:
+
+        shutil.copyfileobj(
+            file.file,
+            buffer
+        )
 
     return {
-        "message": "Файл добавлен в базу",
-        "filename": file.filename
+
+        "message":
+        "Файл добавлен",
+
+        "filename":
+        file.filename
+
     }
 
 
-# =========================
-# ПРОВЕРКА
-# =========================
+# ======================================================
+# CHECK FILE
+# ======================================================
 
 @app.post("/check")
-async def check(file: UploadFile = File(...)):
+async def check(
+    file: UploadFile = File(...)
+):
 
     start = time.time()
 
-    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+    filepath = os.path.join(
+        UPLOAD_FOLDER,
+        file.filename
+    )
 
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    with open(
+        filepath,
+        "wb"
+    ) as buffer:
+
+        shutil.copyfileobj(
+            file.file,
+            buffer
+        )
 
     text = extract_text(filepath)
 
@@ -244,17 +387,50 @@ async def check(file: UploadFile = File(...)):
     plagiarism, source = check_plagiarism(text)
 
     return {
-        "filename": file.filename,
-        "text": text,
-        "plagiarism": plagiarism,
-        "uniqueness": round(100 - plagiarism, 2),
-        "source": source,
-        "errors_count": len(errors),
-        "errors": errors[:50],
-        "time": round(time.time() - start, 2)
+
+        "filename":
+        file.filename,
+
+        "text":
+        text,
+
+        "plagiarism":
+        plagiarism,
+
+        "uniqueness":
+        round(
+            100 - plagiarism,
+            2
+        ),
+
+        "source":
+        source,
+
+        "errors_count":
+        len(errors),
+
+        "errors":
+        errors[:50],
+
+        "time":
+        round(
+            time.time() - start,
+            2
+        )
+
     }
 
 
+# ======================================================
+# HOME
+# ======================================================
+
 @app.get("/")
 def home():
-    return {"status": "TextGuard API running"}
+
+    return {
+
+        "status":
+        "TextGuard API running"
+
+    }
