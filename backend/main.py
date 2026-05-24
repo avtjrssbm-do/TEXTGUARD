@@ -11,8 +11,7 @@ import time
 
 from difflib import SequenceMatcher
 
-
-app = FastAPI()
+app=FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -119,7 +118,7 @@ def extract_text(path):
 
 
 # ====================
-# ОЧИСТКА ТЕКСТА
+# ОЧИСТКА
 # ====================
 
 def clean_text(text):
@@ -142,7 +141,7 @@ def clean_text(text):
 
 
 # ====================
-# ПРОВЕРКА ОШИБОК
+# ОШИБКИ
 # ====================
 
 def check_spelling(text):
@@ -218,28 +217,10 @@ def check_spelling(text):
 
 def check_plagiarism(text):
 
-    input_text=clean_text(
-        text
-    )
-
-    input_parts=re.split(
-        r"[.!?\n]+",
-        input_text
-    )
-
-    input_parts=[
-
-        x.strip()
-
-        for x in input_parts
-
-        if len(x.strip())>20
-
-    ]
+    input_text=clean_text(text)
 
     max_score=0
     source=""
-
 
     for root,dirs,files in os.walk(
         DATABASE_FOLDER
@@ -252,96 +233,43 @@ def check_plagiarism(text):
                 filename
             )
 
-            try:
+            content=extract_text(
+                path
+            )
 
-                content=extract_text(
-                    path
+            content=clean_text(
+                content
+            )
+
+            if not content:
+                continue
+
+
+            if content==input_text:
+
+                return(
+                    100,
+                    filename
                 )
 
-                content=clean_text(
-                    content
-                )
 
-                if not content:
-                    continue
+            similarity=SequenceMatcher(
 
+                None,
+                input_text,
+                content
 
-                # точное совпадение
+            ).ratio()
 
-                if content==input_text:
+            score=round(
+                similarity*100,
+                2
+            )
 
-                    return(
-                        100,
-                        filename
-                    )
+            if score>max_score:
 
-
-                db_parts=re.split(
-                    r"[.!?\n]+",
-                    content
-                )
-
-                db_parts=[
-
-                    x.strip()
-
-                    for x in db_parts
-
-                    if len(x.strip())>20
-
-                ]
-
-
-                matches=0
-
-
-                for part in input_parts:
-
-                    for db_part in db_parts:
-
-                        similarity=SequenceMatcher(
-
-                            None,
-                            part,
-                            db_part
-
-                        ).ratio()
-
-
-                        if similarity>=0.8:
-
-                            matches+=1
-                            break
-
-
-                if len(input_parts)>0:
-
-                    score=round(
-
-                        matches/
-                        len(input_parts)
-                        *100,
-
-                        2
-                    )
-
-                else:
-
-                    score=0
-
-
-                if score>max_score:
-
-                    max_score=score
-                    source=filename
-
-
-            except Exception as e:
-
-                print(
-                    "Ошибка:",
-                    e
-                )
+                max_score=score
+                source=filename
 
 
     return(
@@ -351,7 +279,39 @@ def check_plagiarism(text):
 
 
 # ====================
-# API
+# ДОБАВЛЕНИЕ В БАЗУ
+# ====================
+
+@app.post("/add_to_database")
+async def add_to_database(
+    file:UploadFile=File(...)
+):
+
+    filepath=os.path.join(
+        DATABASE_FOLDER,
+        file.filename
+    )
+
+    with open(
+        filepath,
+        "wb"
+    ) as buffer:
+
+        shutil.copyfileobj(
+            file.file,
+            buffer
+        )
+
+    return{
+
+        "status":"ok",
+        "filename":file.filename
+
+    }
+
+
+# ====================
+# ПРОВЕРКА
 # ====================
 
 @app.post("/check")
@@ -430,4 +390,5 @@ def home():
 
         "status":
         "TextGuard API running"
+
     }
