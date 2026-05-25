@@ -1,3 +1,5 @@
+from typing import List
+from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,6 +9,7 @@ from PyPDF2 import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+import zipfile
 import os
 import shutil
 import requests
@@ -18,7 +21,7 @@ import time
 # FASTAPI
 # ======================================================
 
-app = FastAPI()
+app=FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,15 +36,31 @@ app.add_middleware(
 # FOLDERS
 # ======================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR=os.path.dirname(
+    os.path.abspath(__file__)
+)
 
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-DATABASE_FOLDER = os.path.join(BASE_DIR, "documents_db")
+UPLOAD_FOLDER=os.path.join(
+    BASE_DIR,
+    "uploads"
+)
 
-API_URL = "https://api.languagetool.org/v2/check"
+USER_DATABASE_FOLDER=os.path.join(
+    BASE_DIR,
+    "user_database"
+)
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(DATABASE_FOLDER, exist_ok=True)
+API_URL="https://api.languagetool.org/v2/check"
+
+os.makedirs(
+    UPLOAD_FOLDER,
+    exist_ok=True
+)
+
+os.makedirs(
+    USER_DATABASE_FOLDER,
+    exist_ok=True
+)
 
 
 # ======================================================
@@ -62,7 +81,7 @@ def load_txt(path):
 
 def load_docx(path):
 
-    doc = Document(path)
+    doc=Document(path)
 
     return "\n".join(
         p.text
@@ -73,63 +92,64 @@ def load_docx(path):
 
 def load_pdf(path):
 
-    reader = PdfReader(path)
+    reader=PdfReader(path)
 
-    text = ""
+    text=""
 
     for page in reader.pages:
 
         try:
 
-            page_text = page.extract_text()
+            page_text=page.extract_text()
 
             if page_text:
-                text += page_text + "\n"
+                text+=page_text+"\n"
 
-        except Exception as e:
-
-            print("Ошибка PDF:", e)
+        except:
+            pass
 
     return text
 
 
 def extract_text(path):
 
-    ext = os.path.splitext(path)[1].lower()
+    ext=os.path.splitext(
+        path
+    )[1].lower()
 
     try:
 
-        if ext == ".txt":
+        if ext==".txt":
             return load_txt(path)
 
-        elif ext == ".docx":
+        elif ext==".docx":
             return load_docx(path)
 
-        elif ext == ".pdf":
+        elif ext==".pdf":
             return load_pdf(path)
 
     except Exception as e:
 
-        print("Ошибка чтения файла:", e)
+        print(e)
 
     return ""
 
 
 # ======================================================
-# CLEAN TEXT
+# CLEAN
 # ======================================================
 
 def clean_text(text):
 
-    text = text.lower()
+    text=text.lower()
 
-    text = re.sub(
+    text=re.sub(
         r"[^\w\s]",
         " ",
         text
     )
 
-    text = re.sub(
+    text=re.sub(
         r"\s+",
         " ",
         text
@@ -139,18 +159,18 @@ def clean_text(text):
 
 
 # ======================================================
-# SPLIT TEXT
+# SPLIT
 # ======================================================
 
 def split_text(text):
 
-    text = clean_text(text)
+    text=clean_text(text)
 
-    words = text.split()
+    words=text.split()
 
-    parts = []
+    parts=[]
 
-    chunk_size = 40
+    chunk_size=40
 
     for i in range(
         0,
@@ -158,70 +178,65 @@ def split_text(text):
         chunk_size
     ):
 
-        chunk = " ".join(
-            words[i:i + chunk_size]
+        chunk=" ".join(
+            words[i:i+chunk_size]
         )
 
-        if len(chunk) > 50:
+        if len(chunk)>50:
 
-            parts.append(chunk)
+            parts.append(
+                chunk
+            )
 
     return parts
 
 
 # ======================================================
-# SPELLING CHECK
+# SPELL CHECK
 # ======================================================
 
 def check_spelling(text):
 
     try:
 
-        response = requests.post(
+        response=requests.post(
 
             API_URL,
 
             data={
-                "text": text,
-                "language": "ru"
+                "text":text,
+                "language":"ru"
             },
 
             timeout=15
         )
 
-        data = response.json()
+        data=response.json()
 
-    except Exception as e:
-
-        print("Ошибка проверки:", e)
+    except:
 
         return []
 
-    errors = []
+    errors=[]
 
-    seen = set()
-
-    for m in data.get("matches", []):
-
-        word = text[
-            m["offset"]:
-            m["offset"] + m["length"]
-        ]
-
-        if word in seen:
-            continue
-
-        seen.add(word)
+    for m in data.get(
+        "matches",
+        []
+    ):
 
         errors.append({
 
             "word":
-            word,
+            text[
+                m["offset"]:
+                m["offset"]+
+                m["length"]
+            ],
 
             "message":
             m["message"],
 
-            "replacements": [
+            "replacements":[
 
                 x["value"]
 
@@ -244,159 +259,231 @@ def check_spelling(text):
 
 def check_plagiarism(text):
 
-    input_parts = split_text(text)
+    input_parts=split_text(
+        text
+    )
 
-    if len(input_parts) == 0:
+    if len(input_parts)==0:
 
-        return (
-            0,
-            "Нет текста"
-        )
+        return 0,"Нет текста"
 
-    best_score = 0
-    best_source = ""
+    best_score=0
+    best_source=""
 
-    files = os.listdir(DATABASE_FOLDER)
+    files=os.listdir(
+        USER_DATABASE_FOLDER
+    )
 
-    print("ФАЙЛЫ В БАЗЕ:", files)
+    if len(files)==0:
 
-    if len(files) == 0:
-
-        return (
-            0,
-            "База пуста"
-        )
+        return 0,"База пуста"
 
     for file in files:
 
-        path = os.path.join(
-            DATABASE_FOLDER,
-            file
-        )
-
-        print("ПРОВЕРКА:", path)
-
         try:
 
-            db_text = extract_text(path)
+            path=os.path.join(
+                USER_DATABASE_FOLDER,
+                file
+            )
 
-            if not db_text.strip():
+            db_text=extract_text(
+                path
+            )
 
-                print("Пустой текст:", file)
+            db_parts=split_text(
+                db_text
+            )
+
+            if len(
+                db_parts
+            )==0:
 
                 continue
 
-            db_parts = split_text(db_text)
-
-            if len(db_parts) == 0:
-
-                print("Нет частей:", file)
-
-                continue
-
-            matches = 0
+            matches=0
 
             for input_chunk in input_parts:
 
-                texts = [input_chunk] + db_parts
+                texts=[
 
-                vectorizer = TfidfVectorizer()
+                    input_chunk
 
-                matrix = vectorizer.fit_transform(
+                ]+db_parts
+
+                vectorizer=TfidfVectorizer()
+
+                matrix=vectorizer.fit_transform(
                     texts
                 )
 
-                similarity = cosine_similarity(
+                similarity=cosine_similarity(
                     matrix[0:1],
                     matrix[1:]
                 )
 
-                max_similarity = similarity.max()
+                if similarity.max()>0.3:
 
-                if max_similarity >= 0.3:
+                    matches+=1
 
-                    matches += 1
 
-            score = round(
+            score=round(
 
-                matches /
+                matches/
                 len(input_parts)
-                * 100,
+                *100,
 
                 2
             )
 
-            print("СОВПАДЕНИЕ:", file, score)
 
-            if score > best_score:
+            if score>best_score:
 
-                best_score = score
-                best_source = file
+                best_score=score
+                best_source=file
 
         except Exception as e:
 
-            print(
-                "Ошибка плагиата:",
-                e
-            )
+            print(e)
 
-    return (
-        best_score,
-        best_source
-    )
+    return best_score,best_source
 
 
 # ======================================================
-# ADD FILE TO DATABASE
+# DATABASE MODELS
 # ======================================================
 
-@app.post("/add_to_database")
-async def add_to_database(
-    file: UploadFile = File(...)
+class DatabaseLink(BaseModel):
+
+    url:str
+
+
+# ======================================================
+# UPLOAD FILES DATABASE
+# ======================================================
+
+@app.post("/upload_database")
+
+async def upload_database(
+
+    files:List[UploadFile]=File(...)
+
 ):
 
-    filepath = os.path.join(
-        DATABASE_FOLDER,
-        file.filename
-    )
+    added=[]
 
-    with open(
-        filepath,
-        "wb"
-    ) as buffer:
+    for file in files:
 
-        shutil.copyfileobj(
-            file.file,
-            buffer
+        filepath=os.path.join(
+            USER_DATABASE_FOLDER,
+            file.filename
         )
 
-    print("ФАЙЛ ДОБАВЛЕН:", filepath)
+        with open(
+            filepath,
+            "wb"
+        ) as buffer:
 
-    return {
+            shutil.copyfileobj(
+                file.file,
+                buffer
+            )
 
-        "message":
-        "Файл добавлен в базу",
+        added.append(
+            file.filename
+        )
 
-        "filename":
-        file.filename
+    return{
 
+        "message":"База загружена",
+
+        "files":added
     }
 
 
 # ======================================================
-# CHECK FILE
+# LOAD DATABASE LINK
+# ======================================================
+
+@app.post("/load_database_link")
+
+async def load_database_link(
+
+    data:DatabaseLink
+
+):
+
+    try:
+
+        temp=os.path.join(
+            BASE_DIR,
+            "database.zip"
+        )
+
+        response=requests.get(
+            data.url
+        )
+
+        with open(
+            temp,
+            "wb"
+        ) as f:
+
+            f.write(
+                response.content
+            )
+
+
+        with zipfile.ZipFile(
+            temp,
+            "r"
+        ) as zip_ref:
+
+            zip_ref.extractall(
+                USER_DATABASE_FOLDER
+            )
+
+
+        os.remove(
+            temp
+        )
+
+        return{
+
+            "message":
+            "База подключена"
+
+        }
+
+    except Exception as e:
+
+        return{
+
+            "error":
+            str(e)
+
+        }
+
+
+# ======================================================
+# CHECK
 # ======================================================
 
 @app.post("/check")
+
 async def check(
-    file: UploadFile = File(...)
+
+    file:UploadFile=File(...)
+
 ):
 
-    start = time.time()
+    start=time.time()
 
-    filepath = os.path.join(
+    filepath=os.path.join(
+
         UPLOAD_FOLDER,
         file.filename
+
     )
 
     with open(
@@ -409,15 +496,21 @@ async def check(
             buffer
         )
 
-    print("ПРОВЕРЯЕМ:", filepath)
 
-    text = extract_text(filepath)
+    text=extract_text(
+        filepath
+    )
 
-    errors = check_spelling(text)
+    errors=check_spelling(
+        text
+    )
 
-    plagiarism, source = check_plagiarism(text)
+    plagiarism,source=check_plagiarism(
+        text
+    )
 
-    return {
+
+    return{
 
         "filename":
         file.filename,
@@ -430,7 +523,7 @@ async def check(
 
         "uniqueness":
         round(
-            100 - plagiarism,
+            100-plagiarism,
             2
         ),
 
@@ -445,26 +538,18 @@ async def check(
 
         "time":
         round(
-            time.time() - start,
+            time.time()-start,
             2
         )
-
     }
 
 
-# ======================================================
-# HOME
-# ======================================================
-
 @app.get("/")
+
 def home():
 
-    return {
+    return{
 
         "status":
-        "TextGuard API running",
-
-        "database_path":
-        DATABASE_FOLDER
-
+        "TextGuard API running"
     }
